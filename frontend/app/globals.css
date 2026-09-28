@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Light theme only: citizens use this outdoors in sunlight, high contrast matters. */
+@theme inline {
+  --color-brand-50: #ecfdfa;
+  --color-brand-100: #cff7ef;
+  --color-brand-500: #0f9f8f;
+  --color-brand-600: #0b8275;
+  --color-brand-700: #0a675e;
+  --color-ink: #10231f;
+  --color-muted: #55706a;
+  --color-line: #dbe7e4;
+  --color-surface: #f6faf9;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+}
+
+html,
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e7efed 25%, #f3f8f7 50%, #e7efed 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 0.75rem;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
