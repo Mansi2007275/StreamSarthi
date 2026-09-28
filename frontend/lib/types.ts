@@ -16,6 +16,17 @@ export type ObservationStatus =
   | "corrected"
   | "rejected";
 
+export type PhotoQuality = {
+  blur_score: number;
+  brightness: number;
+  phash: string;
+  is_blurry: boolean;
+  is_dark: boolean;
+  is_overexposed: boolean;
+  is_duplicate: boolean;
+  score: number;
+};
+
 export type IndicatorResult = {
   indicator_id: string;
   human_score: number | null;
@@ -25,6 +36,8 @@ export type IndicatorResult = {
   evidence: string[];
   can_assess: boolean;
   retake_tip: string;
+  photo_quality: PhotoQuality | null;
+  flags: string[];
 };
 
 export type Answer = {
@@ -37,6 +50,24 @@ export type Answer = {
   used_ai_answer: boolean;
   final_score: number | null;
   photo_url: string | null;
+  photo_quality: PhotoQuality | null;
+  flags: string[];
+};
+
+export type TrustIssue = {
+  code: string;
+  message: string;
+  indicator_id?: string;
+};
+
+export type TrustComponents = { A: number; Q: number; C: number; L: number; O: number };
+
+export type TrustBreakdown = {
+  score: number;
+  components: TrustComponents;
+  weights: TrustComponents;
+  issues: TrustIssue[];
+  needs_review: boolean;
 };
 
 export type ObservationSummary = {
@@ -49,7 +80,7 @@ export type ObservationSummary = {
   trust_score: number | null;
 };
 
-export type Observation = ObservationSummary & { answers: Answer[] };
+export type Observation = ObservationSummary & { answers: Answer[]; trust_breakdown: TrustBreakdown | null };
 
 export type ObservationPage = {
   items: ObservationSummary[];

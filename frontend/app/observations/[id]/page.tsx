@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import StatusBadge from "@/components/StatusBadge";
+import TrustCard from "@/components/TrustCard";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Indicator, Observation } from "@/lib/types";
 
@@ -58,6 +59,8 @@ function Detail() {
         </p>
       </div>
 
+      <TrustCard trust={obs.trust_breakdown} />
+
       {obs.answers.length === 0 && <p className="text-muted">No answers saved yet.</p>}
 
       {obs.answers.map((a) => (
@@ -86,6 +89,15 @@ function Detail() {
               <span className="text-muted"> ({a.used_ai_answer ? "used AI's answer" : "kept own answer"})</span>
             </p>
             {a.ai_reason && <p className="text-sm text-muted">AI: {a.ai_reason}</p>}
+            {a.flags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {a.flags.map((f) => (
+                  <span key={f} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+                    {f.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </article>
       ))}
