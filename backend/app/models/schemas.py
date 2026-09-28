@@ -61,6 +61,8 @@ class AnswerOut(BaseModel):
     used_ai_answer: bool = False
     final_score: int | None = None
     photo_url: str | None = None
+    photo_quality: dict | None = None
+    flags: list[str] = []
 
 
 class IndicatorResult(BaseModel):
@@ -74,6 +76,8 @@ class IndicatorResult(BaseModel):
     evidence: list[str]
     can_assess: bool
     retake_tip: str
+    photo_quality: dict | None = None
+    flags: list[str] = []
 
 
 class ObservationOut(BaseModel):
@@ -84,6 +88,7 @@ class ObservationOut(BaseModel):
     created_at: datetime | None = None
     submitted_at: datetime | None = None
     trust_score: float | None = None
+    trust_breakdown: dict | None = None
     answers: list[AnswerOut] = []
 
 

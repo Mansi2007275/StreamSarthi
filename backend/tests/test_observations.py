@@ -49,7 +49,11 @@ def test_full_v1_flow(as_user, storage):
 
     r = c.post(f"/api/v1/observations/{obs['id']}/submit")
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "submitted"
+    body = r.json()
+    assert body["status"] == "submitted"
+    assert body["trust_score"] == 84.0
+    assert body["trust_breakdown"]["needs_review"] is False
+    assert body["trust_breakdown"]["components"]["A"] == 0.8
 
     detail = c.get(f"/api/v1/observations/{obs['id']}").json()
     assert len(detail["answers"]) == len(REQUIRED)
@@ -86,6 +90,22 @@ def test_submit_with_missing_indicators_fails(as_user):
     _answer(c, obs["id"], REQUIRED[0])
     r = c.post(f"/api/v1/observations/{obs['id']}/submit")
     assert r.status_code == 422 and r.json()["error"]["code"] == "MISSING_INDICATORS"
+
+
+def test_low_trust_submission_needs_review(as_user):
+    c = as_user(USER_A)
+    obs = c.post("/api/v1/observations", json={}).json()  # no GPS
+    for ind in REQUIRED:
+        _answer(c, obs["id"], ind, score=1)  # far from the AI's 3, confidence 0.8 -> strong disagreement
+
+    r = c.post(f"/api/v1/observations/{obs['id']}/submit")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "needs_review"
+    assert body["trust_breakdown"]["needs_review"] is True
+
+    flags_by_indicator = {a["indicator_id"]: a["flags"] for a in body["answers"]}
+    assert "strong_disagreement" in flags_by_indicator[REQUIRED[0]]
 
 
 def test_score_out_of_scale_rejected(as_user):
