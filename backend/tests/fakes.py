@@ -10,7 +10,7 @@ class FakeRepo:
         self.answers: dict[tuple[str, str], dict] = {}
 
     def ensure_profile(self, user_id, email):
-        self.profiles.setdefault(user_id, {"id": user_id, "role": "citizen"})
+        self.profiles.setdefault(user_id, {"id": user_id, "role": "citizen", "observer_accuracy": 0.5})
 
     def create_observation(self, user_id, lat, lng):
         oid = str(uuid.uuid4())
@@ -60,6 +60,19 @@ class FakeRepo:
 
     def list_answers(self, obs_id):
         return [dict(a) for (o, _), a in self.answers.items() if o == obs_id]
+
+    def recent_phashes(self, user_id, exclude_obs_id, limit=50):
+        obs_ids = {o["id"] for o in self.observations.values() if o["user_id"] == user_id and o["id"] != exclude_obs_id}
+        hashes = [
+            a["photo_quality"]["phash"]
+            for (oid, _), a in reversed(list(self.answers.items()))
+            if oid in obs_ids and a.get("photo_quality")
+        ]
+        return hashes[:limit]
+
+    def get_profile(self, user_id):
+        p = self.profiles.get(user_id)
+        return dict(p) if p else None
 
 
 class FakeStorage:

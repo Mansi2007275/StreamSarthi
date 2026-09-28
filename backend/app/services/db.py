@@ -25,6 +25,8 @@ class RepoProtocol(Protocol):
     def get_answer(self, obs_id: str, indicator_id: str) -> dict | None: ...
     def update_answer(self, obs_id: str, indicator_id: str, fields: dict[str, Any]) -> dict: ...
     def list_answers(self, obs_id: str) -> list[dict]: ...
+    def recent_phashes(self, user_id: str, exclude_obs_id: str, limit: int = 50) -> list[str]: ...
+    def get_profile(self, user_id: str) -> dict | None: ...
 
 
 def now_iso() -> str:
@@ -93,6 +95,22 @@ class SupabaseRepo:
     def list_answers(self, obs_id):
         res = self.db.table("indicator_answers").select("*").eq("observation_id", obs_id).execute()
         return res.data or []
+
+    def recent_phashes(self, user_id, exclude_obs_id, limit=50):
+        res = (
+            self.db.table("indicator_answers")
+            .select("photo_quality, observation_id, observations!inner(user_id)")
+            .eq("observations.user_id", user_id)
+            .neq("observation_id", exclude_obs_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return [r["photo_quality"]["phash"] for r in (res.data or []) if r.get("photo_quality")]
+
+    def get_profile(self, user_id):
+        res = self.db.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+        return res.data[0] if res.data else None
 
 
 @lru_cache
