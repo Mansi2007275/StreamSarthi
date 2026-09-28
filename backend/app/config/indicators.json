@@ -1,0 +1,62 @@
+[
+  {
+    "id": "water_appearance",
+    "label": "Water appearance",
+    "help": {
+      "en": "How clear or murky is the water?",
+      "hi": "Paani kitna saaf ya dhundhla hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Very clear", "Clear", "Slightly cloudy", "Cloudy", "Very murky"],
+    "photo_required": true,
+    "required": true
+  },
+  {
+    "id": "litter",
+    "label": "Litter and waste",
+    "help": {
+      "en": "How much plastic, trash or waste can you see in or near the water?",
+      "hi": "Paani mein ya kinare pe kitna plastic ya kachra dikh raha hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["None", "A little", "Some", "A lot", "Covered in waste"],
+    "photo_required": true,
+    "required": true
+  },
+  {
+    "id": "bank_vegetation",
+    "label": "Bank vegetation",
+    "help": {
+      "en": "How much natural plant cover is on the stream banks?",
+      "hi": "Kinaron pe kitni hariyali / paudhe hain?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Dense natural cover", "Mostly covered", "Patchy", "Sparse", "Bare or concrete"],
+    "photo_required": true,
+    "required": true
+  },
+  {
+    "id": "foam_or_film",
+    "label": "Foam, oil or surface film",
+    "help": {
+      "en": "Do you see foam, oily shine or a film on the water surface?",
+      "hi": "Paani ki satah pe jhaag, tel ki chamak ya parat dikh rahi hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["None", "Trace", "Some patches", "Widespread", "Thick layer"],
+    "photo_required": true,
+    "required": true
+  },
+  {
+    "id": "water_flow",
+    "label": "Water flow",
+    "help": {
+      "en": "Is the water flowing or is it still/stagnant?",
+      "hi": "Paani beh raha hai ya ruka hua hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Strong natural flow", "Steady flow", "Slow", "Barely moving", "Stagnant / dry"],
+    "photo_required": true,
+    "required": false
+  }
+]
