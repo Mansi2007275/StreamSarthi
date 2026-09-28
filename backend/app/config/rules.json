@@ -1,0 +1,18 @@
+[
+  {
+    "id": "clear_water_but_thick_film",
+    "when": [
+      { "indicator": "water_appearance", "op": "<=", "value": 1 },
+      { "indicator": "foam_or_film", "op": ">=", "value": 4 }
+    ],
+    "message": "Water marked very clear, but a thick surface film is reported"
+  },
+  {
+    "id": "natural_banks_but_covered_in_waste",
+    "when": [
+      { "indicator": "bank_vegetation", "op": "<=", "value": 1 },
+      { "indicator": "litter", "op": ">=", "value": 5 }
+    ],
+    "message": "Banks marked fully natural, but covered in waste"
+  }
+]
