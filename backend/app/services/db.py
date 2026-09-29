@@ -43,6 +43,7 @@ class RepoProtocol(Protocol):
     def count_unseen_lessons(self, user_id: str) -> int: ...
     def get_lesson(self, lesson_id: str) -> dict | None: ...
     def mark_lesson_seen(self, lesson_id: str) -> dict: ...
+    def list_map_observations(self, statuses: list[str]) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -211,6 +212,17 @@ class SupabaseRepo:
     def mark_lesson_seen(self, lesson_id):
         res = self.db.table("lessons").update({"seen": True, "seen_at": now_iso()}).eq("id", lesson_id).execute()
         return res.data[0]
+
+    def list_map_observations(self, statuses):
+        res = (
+            self.db.table("observations")
+            .select("id, user_id, lat, lng, trust_score, status, one_health, submitted_at")
+            .in_("status", statuses)
+            .not_.is_("lat", "null")
+            .not_.is_("lng", "null")
+            .execute()
+        )
+        return res.data or []
 
 
 @lru_cache

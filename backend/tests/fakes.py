@@ -169,6 +169,13 @@ class FakeRepo:
         self.lessons[lesson_id]["seen_at"] = now_iso()
         return dict(self.lessons[lesson_id])
 
+    def list_map_observations(self, statuses):
+        return [
+            dict(o)
+            for o in self.observations.values()
+            if o["status"] in statuses and o.get("lat") is not None and o.get("lng") is not None
+        ]
+
 
 class FakeStorage:
     def __init__(self):

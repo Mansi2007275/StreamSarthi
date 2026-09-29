@@ -194,3 +194,22 @@ class LessonOut(BaseModel):
 class LessonsPage(BaseModel):
     items: list[LessonOut]
     unseen_count: int
+
+
+# ---------- v4: map ----------
+class MapPointOut(BaseModel):
+    id: str
+    lat: float
+    lng: float
+    trust_score: float | None
+    status: str
+    one_health_level: str | None
+    submitted_at: str | None
+    is_mine: bool
+    can_open: bool
+
+
+class MapResponse(BaseModel):
+    points: list[MapPointOut]
+    total: int
+    truncated: bool
