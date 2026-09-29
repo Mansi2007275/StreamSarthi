@@ -9,6 +9,8 @@ from app.services.scoring import final_score
 WEIGHTS = {"A": 0.30, "Q": 0.20, "C": 0.15, "L": 0.15, "O": 0.20}
 REVIEW_THRESHOLD = 60
 MIN_USABLE_CONFIDENCE = 0.3
+ACCURACY_OLD_WEIGHT = 0.8
+ACCURACY_NEW_WEIGHT = 0.2
 
 
 def _agreement(answers: list[dict], indicators_by_id: dict[str, Indicator]) -> float:
@@ -74,3 +76,26 @@ def compute_trust(
         "issues": issues,
         "needs_review": needs_review,
     }
+
+
+def updated_accuracy(old: float | None, answers: list[dict], corrections: dict[str, int]) -> float:
+    """EMA: new = 0.8*old + 0.2*(matching/total).
+
+    Matching = the answer's final score equals the expert's truth (the correction,
+    if that indicator was corrected, else the final score itself - a trivial match).
+    Callers skip this entirely for "reject": rejections are usually about bad
+    photos or wrong locations, not scoring judgment, so they shouldn't move accuracy.
+    """
+    if old is None:
+        old = 0.5
+    scored = [a for a in answers if final_score(a) is not None]
+    total = len(scored)
+    if total == 0:
+        return old
+    matching = sum(
+        1
+        for a in scored
+        if a["indicator_id"] not in corrections or corrections[a["indicator_id"]] == final_score(a)
+    )
+    new = ACCURACY_OLD_WEIGHT * old + ACCURACY_NEW_WEIGHT * (matching / total)
+    return round(new, 4)
