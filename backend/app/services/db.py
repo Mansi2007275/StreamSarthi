@@ -38,6 +38,11 @@ class RepoProtocol(Protocol):
     def last_audit_event(self, obs_id: str) -> dict | None: ...
     def insert_audit_event(self, row: dict[str, Any]) -> dict: ...
     def list_audit_events(self, obs_id: str) -> list[dict]: ...
+    def upsert_lesson(self, row: dict[str, Any]) -> dict: ...
+    def list_lessons(self, user_id: str, unseen_only: bool, limit: int) -> list[dict]: ...
+    def count_unseen_lessons(self, user_id: str) -> int: ...
+    def get_lesson(self, lesson_id: str) -> dict | None: ...
+    def mark_lesson_seen(self, lesson_id: str) -> dict: ...
 
 
 def now_iso() -> str:
@@ -183,6 +188,29 @@ class SupabaseRepo:
     def list_audit_events(self, obs_id):
         res = self.db.table("audit_events").select("*").eq("observation_id", obs_id).order("id").execute()
         return res.data or []
+
+    def upsert_lesson(self, row):
+        res = self.db.table("lessons").upsert(row, on_conflict="observation_id,indicator_id").execute()
+        return res.data[0]
+
+    def list_lessons(self, user_id, unseen_only, limit):
+        q = self.db.table("lessons").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit)
+        if unseen_only:
+            q = q.eq("seen", False)
+        res = q.execute()
+        return res.data or []
+
+    def count_unseen_lessons(self, user_id):
+        res = self.db.table("lessons").select("id", count="exact").eq("user_id", user_id).eq("seen", False).execute()
+        return res.count or 0
+
+    def get_lesson(self, lesson_id):
+        res = self.db.table("lessons").select("*").eq("id", lesson_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def mark_lesson_seen(self, lesson_id):
+        res = self.db.table("lessons").update({"seen": True, "seen_at": now_iso()}).eq("id", lesson_id).execute()
+        return res.data[0]
 
 
 @lru_cache

@@ -17,6 +17,7 @@ from app.routers.observations import _observation_out
 from app.services import audit
 from app.services.db import RepoProtocol, get_repo, now_iso
 from app.services.indicators import get_indicator, load_indicators
+from app.services.lessons import build_lessons
 from app.services.one_health import compute_one_health
 from app.services.scoring import truth_score
 from app.services.storage import StorageProtocol, get_storage
@@ -112,6 +113,13 @@ def review_action(
     if body.action == "correct":
         for ind_id, score in body.corrections.items():
             repo.update_answer(obs_id, ind_id, {"expert_score": score})
+
+        try:
+            for lesson in build_lessons(obs, answers, body.corrections, body.note):
+                repo.upsert_lesson(lesson)
+        except Exception:
+            logger.exception("lesson_creation_failed", extra={"extra_fields": {"observation_id": obs_id}})
+
         answers = repo.list_answers(obs_id)  # refresh with expert_score
 
     new_status = _NEW_STATUS[body.action]

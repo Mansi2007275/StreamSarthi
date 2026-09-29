@@ -11,6 +11,9 @@ class FakeRepo:
         self.audit_events: dict[str, list[dict]] = {}
         self._audit_seen: set[tuple[str, str]] = set()
         self._audit_next_id = 1
+        self.lessons: dict[str, dict] = {}
+        self._lesson_by_key: dict[tuple[str, str], str] = {}
+        self._lesson_next_id = 1
 
     def ensure_profile(self, user_id, email):
         self.profiles.setdefault(
@@ -134,6 +137,37 @@ class FakeRepo:
 
     def list_audit_events(self, obs_id):
         return [dict(e) for e in self.audit_events.get(obs_id, [])]
+
+    def upsert_lesson(self, row):
+        key = (row["observation_id"], row["indicator_id"])
+        lid = self._lesson_by_key.get(key)
+        if lid is None:
+            lid = str(self._lesson_next_id)
+            self._lesson_next_id += 1
+            self._lesson_by_key[key] = lid
+            self.lessons[lid] = {"id": lid, "seen": False, "seen_at": None, "created_at": now_iso()}
+        self.lessons[lid].update(row)
+        self.lessons[lid]["id"] = lid
+        return dict(self.lessons[lid])
+
+    def list_lessons(self, user_id, unseen_only, limit):
+        rows = [lesson for lesson in self.lessons.values() if lesson["user_id"] == user_id]
+        if unseen_only:
+            rows = [lesson for lesson in rows if not lesson["seen"]]
+        rows.sort(key=lambda lesson: lesson["created_at"], reverse=True)
+        return [dict(lesson) for lesson in rows[:limit]]
+
+    def count_unseen_lessons(self, user_id):
+        return sum(1 for lesson in self.lessons.values() if lesson["user_id"] == user_id and not lesson["seen"])
+
+    def get_lesson(self, lesson_id):
+        lesson = self.lessons.get(lesson_id)
+        return dict(lesson) if lesson else None
+
+    def mark_lesson_seen(self, lesson_id):
+        self.lessons[lesson_id]["seen"] = True
+        self.lessons[lesson_id]["seen_at"] = now_iso()
+        return dict(self.lessons[lesson_id])
 
 
 class FakeStorage:

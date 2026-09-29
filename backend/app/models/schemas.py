@@ -173,3 +173,24 @@ class AuditVerification(BaseModel):
 class AuditResponse(BaseModel):
     events: list[AuditEventOut]
     verification: AuditVerification
+
+
+# ---------- v4: micro-lessons ----------
+class LessonOut(BaseModel):
+    id: str
+    observation_id: str
+    indicator_id: str
+    indicator_label: str
+    your_score: int | None
+    your_label: str | None
+    expert_score: int
+    expert_label: str | None
+    why: str
+    tip: str
+    created_at: str | None
+    seen: bool
+
+
+class LessonsPage(BaseModel):
+    items: list[LessonOut]
+    unseen_count: int
