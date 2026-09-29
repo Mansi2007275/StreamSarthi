@@ -25,7 +25,7 @@ export default function NavBar({ email }: { email: string }) {
     router.replace("/login");
   }
 
-  const allLinks = canReview ? [...links, { href: "/review", label: "Review" }] : links;
+  const allLinks = canReview ? [...links, { href: "/review", label: "Review" }, { href: "/insights", label: "Insights" }] : links;
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
