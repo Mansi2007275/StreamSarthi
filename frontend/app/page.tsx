@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
+import LessonCard from "@/components/LessonCard";
 import StatusBadge from "@/components/StatusBadge";
 import { api, friendlyMessage } from "@/lib/api";
 import type { ObservationPage } from "@/lib/types";
@@ -29,6 +30,8 @@ function Dashboard() {
           + New assessment
         </Link>
       </section>
+
+      <LessonCard />
 
       <section>
         <div className="mb-2 flex items-center justify-between">

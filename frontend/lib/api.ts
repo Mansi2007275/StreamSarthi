@@ -4,6 +4,9 @@ import type {
   Answer,
   Indicator,
   IndicatorResult,
+  Lesson,
+  LessonsPage,
+  MapResponse,
   Me,
   Observation,
   ObservationPage,
@@ -98,4 +101,14 @@ export const api = {
   reviewDetail: (obsId: string) => request<ReviewDetail>(`/api/v1/review/${obsId}`),
   reviewAction: (obsId: string, body: ReviewActionBody) =>
     request<ReviewDetail>(`/api/v1/review/${obsId}`, { method: "POST", json: body }),
+  lessons: (unseen = false, limit = 5) => request<LessonsPage>(`/api/v1/lessons?unseen=${unseen}&limit=${limit}`),
+  markLessonSeen: (lessonId: string) => request<Lesson>(`/api/v1/lessons/${lessonId}/seen`, { method: "POST" }),
+  map: (params: { minTrust?: number; status?: string[]; bbox?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.minTrust !== undefined) q.set("min_trust", String(params.minTrust));
+    if (params.status?.length) q.set("status", params.status.join(","));
+    if (params.bbox) q.set("bbox", params.bbox);
+    if (params.limit !== undefined) q.set("limit", String(params.limit));
+    return request<MapResponse>(`/api/v1/map?${q.toString()}`);
+  },
 };

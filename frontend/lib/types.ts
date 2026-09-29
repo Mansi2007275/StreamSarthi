@@ -171,3 +171,43 @@ export type AuditResponse = {
   events: AuditEvent[];
   verification: AuditVerification;
 };
+
+// ---------- v4: micro-lessons ----------
+export type Lesson = {
+  id: string;
+  observation_id: string;
+  indicator_id: string;
+  indicator_label: string;
+  your_score: number | null;
+  your_label: string | null;
+  expert_score: number;
+  expert_label: string | null;
+  why: string;
+  tip: string;
+  created_at: string | null;
+  seen: boolean;
+};
+
+export type LessonsPage = {
+  items: Lesson[];
+  unseen_count: number;
+};
+
+// ---------- v4: map ----------
+export type MapPoint = {
+  id: string;
+  lat: number;
+  lng: number;
+  trust_score: number | null;
+  status: ObservationStatus;
+  one_health_level: OneHealth["level"] | null;
+  submitted_at: string | null;
+  is_mine: boolean;
+  can_open: boolean;
+};
+
+export type MapResponse = {
+  points: MapPoint[];
+  total: number;
+  truncated: boolean;
+};

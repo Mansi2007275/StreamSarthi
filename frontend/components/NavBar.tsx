@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useUnseenLessonsCount } from "@/lib/lessonsStore";
 import { supabase } from "@/lib/supabase";
 import { useMe } from "@/lib/useMe";
 
@@ -9,6 +10,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/assess", label: "New" },
   { href: "/observations", label: "History" },
+  { href: "/map", label: "Map" },
 ];
 
 export default function NavBar({ email }: { email: string }) {
@@ -16,6 +18,7 @@ export default function NavBar({ email }: { email: string }) {
   const router = useRouter();
   const me = useMe();
   const canReview = me?.role === "expert" || me?.role === "admin";
+  const unseenLessons = useUnseenLessonsCount();
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -38,9 +41,12 @@ export default function NavBar({ email }: { email: string }) {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`flex min-h-11 items-center rounded-lg px-2 ${active ? "bg-brand-50 font-medium text-brand-700" : "text-muted"}`}
+                className={`relative flex min-h-11 items-center rounded-lg px-2 ${active ? "bg-brand-50 font-medium text-brand-700" : "text-muted"}`}
               >
                 {l.label}
+                {l.href === "/" && unseenLessons > 0 && (
+                  <span aria-label={`${unseenLessons} unseen lessons`} className="absolute right-0.5 top-1 h-2 w-2 rounded-full bg-red-500" />
+                )}
               </Link>
             );
           })}
