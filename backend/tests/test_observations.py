@@ -4,7 +4,7 @@ from PIL import Image
 
 from app.services.indicators import load_indicators
 from app.services.storage import process_image
-from tests.conftest import USER_A, USER_B, jpeg_bytes
+from tests.conftest import USER_A, USER_B, USER_EXPERT, jpeg_bytes, make_expert
 
 REQUIRED = [i.id for i in load_indicators() if i.required]
 
@@ -123,6 +123,41 @@ def test_non_image_upload_rejected(as_user):
         files={"photo": ("evil.pdf", b"%PDF-1.4", "application/pdf")},
     )
     assert r.status_code == 415
+
+
+def test_full_flow_writes_audit_events_in_order(as_user):
+    c = as_user(USER_A)
+    obs = c.post("/api/v1/observations", json={"lat": 28.6, "lng": 77.4}).json()
+    for ind in REQUIRED:
+        _answer(c, obs["id"], ind)
+    r = c.patch(f"/api/v1/observations/{obs['id']}/indicators/{REQUIRED[0]}", json={"used_ai_answer": True})
+    assert r.status_code == 200
+    c.post(f"/api/v1/observations/{obs['id']}/submit")
+
+    r = c.get(f"/api/v1/observations/{obs['id']}/audit")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    events = [e["event"] for e in body["events"]]
+
+    assert events[0] == "observation_created"
+    assert events.count("ai_suggested") == len(REQUIRED)
+    assert "human_used_ai" in events
+    assert events[-1] in ("submitted", "flagged", "routed_to_review")
+    assert body["verification"]["valid"] is True
+    assert all(e["actor_role"] == "citizen" for e in body["events"])
+
+
+def test_audit_is_404_for_non_owner(as_user):
+    obs = as_user(USER_A).post("/api/v1/observations", json={}).json()
+    r = as_user(USER_B).get(f"/api/v1/observations/{obs['id']}/audit")
+    assert r.status_code == 404
+
+
+def test_audit_is_visible_to_expert(as_user, repo):
+    make_expert(repo)
+    obs = as_user(USER_A).post("/api/v1/observations", json={}).json()
+    r = as_user(USER_EXPERT).get(f"/api/v1/observations/{obs['id']}/audit")
+    assert r.status_code == 200
 
 
 def test_image_is_reencoded_resized_and_exif_stripped():

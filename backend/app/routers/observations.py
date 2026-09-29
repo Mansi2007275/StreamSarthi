@@ -12,6 +12,7 @@ from app.core.ratelimit import RateLimiter
 from app.models.schemas import (
     AnswerChoice,
     AnswerOut,
+    AuditResponse,
     Indicator,
     IndicatorResult,
     ObservationCreate,
@@ -20,7 +21,7 @@ from app.models.schemas import (
     ObservationPage,
     ObservationSummary,
 )
-from app.services import ai_opinion
+from app.services import ai_opinion, audit
 from app.services import photo_quality as pq
 from app.services.consistency import check_observation, is_strong_disagreement
 from app.services.db import RepoProtocol, get_repo, now_iso
@@ -32,6 +33,14 @@ from app.services.trust import compute_trust
 logger = logging.getLogger("streamsaathi")
 
 router = APIRouter(prefix="/api/v1", tags=["observations"])
+
+
+def _audit_best_effort(repo: RepoProtocol, obs_id: str, actor_id: str, event: str, payload: dict) -> None:
+    """Citizen-flow audit writes are best-effort: they must never block a citizen action."""
+    try:
+        audit.append_event(repo, obs_id, actor_id, event, payload)
+    except Exception:
+        logger.exception("audit_failed", extra={"extra_fields": {"observation_id": obs_id, "event": event}})
 
 
 @lru_cache
@@ -85,6 +94,7 @@ def _answer_out(ans: dict, storage: StorageProtocol | None = None) -> AnswerOut:
         photo_url=url,
         photo_quality=ans.get("photo_quality"),
         flags=ans.get("flags") or [],
+        expert_score=ans.get("expert_score"),
     )
 
 
@@ -100,6 +110,8 @@ def _observation_out(obs: dict, answers: list[dict], storage: StorageProtocol | 
         submitted_at=obs.get("submitted_at"),
         trust_score=obs.get("trust_score"),
         trust_breakdown=obs.get("trust_breakdown"),
+        review_note=obs.get("review_note"),
+        reviewed_at=obs.get("reviewed_at"),
         answers=[_answer_out(a, storage) for a in answers],
     )
 
@@ -123,6 +135,7 @@ def create_observation(
 ):
     repo.ensure_profile(user.id, user.email)
     obs = repo.create_observation(user.id, body.lat, body.lng)
+    _audit_best_effort(repo, obs["id"], user.id, "observation_created", {"lat": body.lat, "lng": body.lng})
     return ObservationCreated(id=obs["id"], status=obs["status"])
 
 
@@ -186,6 +199,15 @@ async def answer_indicator(
     )
     repo.upsert_answer(row)  # unique(observation_id, indicator_id) -> retake overwrites, no duplicates
 
+    if opinion.suggested_score is not None:
+        _audit_best_effort(
+            repo,
+            obs_id,
+            user.id,
+            "ai_suggested",
+            {"indicator": indicator_id, "ai_score": opinion.suggested_score, "confidence": opinion.confidence},
+        )
+
     return IndicatorResult(
         indicator_id=indicator_id,
         human_score=human_score,
@@ -221,7 +243,16 @@ def choose_answer(
     if body.human_score is not None:
         _check_score(body.human_score, ind)
         fields["human_score"] = body.human_score
-    return _answer_out(repo.update_answer(obs_id, indicator_id, fields))
+    updated = repo.update_answer(obs_id, indicator_id, fields)
+    event = "human_used_ai" if body.used_ai_answer else "human_kept_own"
+    _audit_best_effort(
+        repo,
+        obs_id,
+        user.id,
+        event,
+        {"indicator": indicator_id, "human_score": updated.get("human_score"), "ai_score": updated.get("ai_score")},
+    )
+    return _answer_out(updated)
 
 
 @router.post("/observations/{obs_id}/submit", response_model=ObservationOut)
@@ -261,6 +292,12 @@ def submit(
             if "strong_disagreement" not in existing:
                 repo.update_answer(obs_id, a["indicator_id"], {"flags": existing + ["strong_disagreement"]})
 
+    _audit_best_effort(repo, obs_id, user.id, "submitted", {"trust_score": trust["score"]})
+    if issues:
+        _audit_best_effort(repo, obs_id, user.id, "flagged", {"issues": [i["code"] for i in issues]})
+    if trust["needs_review"]:
+        _audit_best_effort(repo, obs_id, user.id, "routed_to_review", {"trust_score": trust["score"]})
+
     log_event("trust_computed", observation_id=obs_id, score=trust["score"], needs_review=trust["needs_review"])
 
     answers = repo.list_answers(obs_id)  # refreshed, so the response reflects the new flags
@@ -289,3 +326,44 @@ def observation_detail(
 ):
     obs = _own_observation(repo, obs_id, user)
     return _observation_out(obs, repo.list_answers(obs_id), storage)
+
+
+@router.get("/observations/{obs_id}/audit", response_model=AuditResponse)
+def observation_audit(
+    obs_id: str,
+    user: CurrentUser = Depends(_user),
+    repo: RepoProtocol = Depends(get_repo),
+):
+    obs = repo.get_observation(obs_id)
+    if not obs:
+        raise not_found("Observation")
+    profile = repo.get_profile(user.id)
+    is_owner = obs["user_id"] == user.id
+    is_reviewer = bool(profile and profile.get("role") in ("expert", "admin"))
+    if not is_owner and not is_reviewer:
+        raise not_found("Observation")
+
+    events = repo.list_audit_events(obs_id)
+    verification = audit.verify_chain(events)
+
+    role_cache: dict[str, str] = {}
+
+    def role_of(actor_id: str | None) -> str:
+        if actor_id is None:
+            return "system"
+        if actor_id not in role_cache:
+            p = repo.get_profile(actor_id)
+            role_cache[actor_id] = (p or {}).get("role", "citizen")
+        return role_cache[actor_id]
+
+    out_events = [
+        {
+            "event": e["event"],
+            "actor_role": role_of(e.get("actor_id")),
+            "payload": e["payload"],
+            "created_at": e["created_at"],
+            "hash_short": f"{e['hash'][:6]}...{e['hash'][-4:]}",
+        }
+        for e in events
+    ]
+    return AuditResponse(events=out_events, verification=verification)
