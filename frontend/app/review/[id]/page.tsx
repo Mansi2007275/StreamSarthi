@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import AuditTimeline from "@/components/AuditTimeline";
 import ExpertGate from "@/components/ExpertGate";
+import OneHealthCard from "@/components/OneHealthCard";
 import ScalePicker from "@/components/ScalePicker";
 import TrustCard from "@/components/TrustCard";
 import { useToast } from "@/components/Toast";
@@ -96,6 +97,7 @@ function Detail() {
       </div>
 
       <TrustCard trust={obs.trust_breakdown} />
+      <OneHealthCard oneHealth={obs.one_health} />
 
       {obs.answers.map((a) => {
         const ind = indById[a.indicator_id];

@@ -81,11 +81,26 @@ export type ObservationSummary = {
   trust_score: number | null;
 };
 
+export type OneHealthDriver = { indicator_id: string; label: string; severity: number };
+
+export type OneHealth = {
+  level: "good" | "moderate" | "poor";
+  color: string;
+  severity: number;
+  ecosystem: string;
+  animals: string;
+  people: string;
+  disclaimer: string;
+  drivers: OneHealthDriver[];
+  based_on: "expert" | "citizen";
+};
+
 export type Observation = ObservationSummary & {
   answers: Answer[];
   trust_breakdown: TrustBreakdown | null;
   review_note: string | null;
   reviewed_at: string | null;
+  one_health: OneHealth | null;
 };
 
 export type ObservationPage = {

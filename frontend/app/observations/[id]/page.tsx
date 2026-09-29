@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import AuditTimeline from "@/components/AuditTimeline";
 import AuthGuard from "@/components/AuthGuard";
+import OneHealthCard from "@/components/OneHealthCard";
 import StatusBadge from "@/components/StatusBadge";
 import TrustCard from "@/components/TrustCard";
 import { api, friendlyMessage } from "@/lib/api";
@@ -63,6 +64,7 @@ function Detail() {
       </div>
 
       <TrustCard trust={obs.trust_breakdown} />
+      <OneHealthCard oneHealth={obs.one_health} />
 
       {obs.review_note && (
         <div className="rounded-2xl border border-line bg-white p-4">
