@@ -18,6 +18,16 @@ from tests.fakes import FakeRepo, FakeStorage  # noqa: E402
 
 USER_A = CurrentUser(id="user-a", email="a@test.com")
 USER_B = CurrentUser(id="user-b", email="b@test.com")
+USER_EXPERT = CurrentUser(id="user-expert", email="expert@test.com")
+
+
+def make_expert(repo, user_id: str = USER_EXPERT.id) -> None:
+    repo.profiles[user_id] = {
+        "id": user_id,
+        "role": "expert",
+        "observer_accuracy": 0.5,
+        "display_name": "expert",
+    }
 
 
 @pytest.fixture

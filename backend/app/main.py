@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import add_request_logging, setup_logging
-from app.routers import observations
+from app.routers import me, observations, review
 
 setup_logging()
 settings = get_settings()
@@ -26,6 +26,8 @@ app.add_middleware(
 )
 register_error_handlers(app)
 app.include_router(observations.router)
+app.include_router(me.router)
+app.include_router(review.router)
 
 
 @app.get("/", include_in_schema=False)
