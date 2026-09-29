@@ -1,0 +1,23 @@
+[
+  {
+    "id": "cal1",
+    "image": "/calibration/cal1.svg",
+    "indicator_id": "water_appearance",
+    "expert_score": 4,
+    "explanation": "You cannot see the bottom and the water is brown, so it is Cloudy (4)."
+  },
+  {
+    "id": "cal2",
+    "image": "/calibration/cal2.svg",
+    "indicator_id": "litter",
+    "expert_score": 3,
+    "explanation": "Several plastic items along the bank, but not covering it: Some (3)."
+  },
+  {
+    "id": "cal3",
+    "image": "/calibration/cal3.svg",
+    "indicator_id": "bank_vegetation",
+    "expert_score": 2,
+    "explanation": "Most of the bank has grass and shrubs with small bare patches: Mostly covered (2)."
+  }
+]

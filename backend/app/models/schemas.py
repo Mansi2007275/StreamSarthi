@@ -122,6 +122,7 @@ class MeOut(BaseModel):
     display_name: str | None
     role: str
     observer_accuracy: float | None
+    calibrated_at: str | None = None
 
 
 # ---------- v3: expert review ----------
@@ -213,3 +214,44 @@ class MapResponse(BaseModel):
     points: list[MapPointOut]
     total: int
     truncated: bool
+
+
+# ---------- v5: calibration ----------
+class CalibrationItemOut(BaseModel):
+    id: str
+    image: str
+    indicator_id: str
+
+
+class CalibrationAnswerIn(BaseModel):
+    id: str
+    score: int
+
+
+class CalibrationAnswerOut(BaseModel):
+    expert_score: int
+    explanation: str
+    correct: bool
+
+
+class CalibrationCompleteIn(BaseModel):
+    answers: dict[str, int]
+
+
+class CalibrationCompleteOut(BaseModel):
+    accuracy: float
+    calibrated_at: str
+
+
+# ---------- v5: disagreement heatmap ----------
+class DisagreementOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    mean_abs_diff: float | None
+    mean_bias: float | None
+    strong_rate: float | None
+    human_wrong_rate: float | None
+    ai_wrong_rate: float | None
+    matrix: list[list[int]]
+    scale: list[int]
