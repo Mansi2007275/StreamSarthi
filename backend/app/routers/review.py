@@ -16,7 +16,8 @@ from app.models.schemas import ReviewAction, ReviewDetail, ReviewQueuePage
 from app.routers.observations import _observation_out
 from app.services import audit
 from app.services.db import RepoProtocol, get_repo, now_iso
-from app.services.indicators import get_indicator
+from app.services.indicators import get_indicator, load_indicators
+from app.services.one_health import compute_one_health
 from app.services.scoring import truth_score
 from app.services.storage import StorageProtocol, get_storage
 from app.services.trust import updated_accuracy
@@ -113,13 +114,22 @@ def review_action(
             repo.update_answer(obs_id, ind_id, {"expert_score": score})
         answers = repo.list_answers(obs_id)  # refresh with expert_score
 
+    new_status = _NEW_STATUS[body.action]
+
+    one_health = None
+    try:
+        one_health = compute_one_health({**obs, "status": new_status}, answers, load_indicators())
+    except Exception:
+        logger.exception("one_health_failed", extra={"extra_fields": {"observation_id": obs_id}})
+
     obs = repo.update_observation(
         obs_id,
         {
-            "status": _NEW_STATUS[body.action],
+            "status": new_status,
             "reviewed_by": expert.id,
             "reviewed_at": now_iso(),
             "review_note": body.note,
+            "one_health": one_health,
         },
     )
 

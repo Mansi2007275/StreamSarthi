@@ -22,6 +22,7 @@ class Indicator(BaseModel):
     scale_labels: list[str]
     photo_required: bool = True
     required: bool = True
+    higher_is_worse: bool = True
 
 
 # ---------- AI ----------
@@ -93,6 +94,7 @@ class ObservationOut(BaseModel):
     trust_breakdown: dict | None = None
     review_note: str | None = None
     reviewed_at: datetime | None = None
+    one_health: dict | None = None
     answers: list[AnswerOut] = []
 
 

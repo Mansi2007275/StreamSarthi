@@ -1,0 +1,30 @@
+{
+  "min_answered_ratio": 0.5,
+  "levels": [
+    {
+      "level": "good",
+      "max_severity": 0.30,
+      "color": "green",
+      "ecosystem": "Water and banks look healthy enough to support aquatic plants and insects.",
+      "animals": "Birds, fish and livestock using this stream are at lower visible risk.",
+      "people": "No strong visible warning signs. Still, never drink untreated stream water."
+    },
+    {
+      "level": "moderate",
+      "max_severity": 0.60,
+      "color": "amber",
+      "ecosystem": "Signs of stress: cloudiness, litter or thin vegetation reduce habitat quality.",
+      "animals": "Animals drinking here may be exposed to waste and pollutants.",
+      "people": "Avoid skin contact where foam or waste is visible; wash hands after visiting."
+    },
+    {
+      "level": "poor",
+      "max_severity": 1.00,
+      "color": "red",
+      "ecosystem": "Heavy visible pollution. Low oxygen and habitat loss are likely.",
+      "animals": "High risk for fish and animals; stray and farm animals should not drink here.",
+      "people": "Avoid contact. Report to local authorities; mosquito breeding and disease risk may be higher."
+    }
+  ],
+  "disclaimer": "Indicative only, based on visual observation. Not a lab water test and not medical advice."
+}

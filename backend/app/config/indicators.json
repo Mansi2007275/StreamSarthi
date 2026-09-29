@@ -9,7 +9,8 @@
     "scale": [1, 5],
     "scale_labels": ["Very clear", "Clear", "Slightly cloudy", "Cloudy", "Very murky"],
     "photo_required": true,
-    "required": true
+    "required": true,
+    "higher_is_worse": true
   },
   {
     "id": "litter",
@@ -21,7 +22,8 @@
     "scale": [1, 5],
     "scale_labels": ["None", "A little", "Some", "A lot", "Covered in waste"],
     "photo_required": true,
-    "required": true
+    "required": true,
+    "higher_is_worse": true
   },
   {
     "id": "bank_vegetation",
@@ -33,7 +35,8 @@
     "scale": [1, 5],
     "scale_labels": ["Dense natural cover", "Mostly covered", "Patchy", "Sparse", "Bare or concrete"],
     "photo_required": true,
-    "required": true
+    "required": true,
+    "higher_is_worse": true
   },
   {
     "id": "foam_or_film",
@@ -45,7 +48,8 @@
     "scale": [1, 5],
     "scale_labels": ["None", "Trace", "Some patches", "Widespread", "Thick layer"],
     "photo_required": true,
-    "required": true
+    "required": true,
+    "higher_is_worse": true
   },
   {
     "id": "water_flow",
@@ -57,6 +61,7 @@
     "scale": [1, 5],
     "scale_labels": ["Strong natural flow", "Steady flow", "Slow", "Barely moving", "Stagnant / dry"],
     "photo_required": true,
-    "required": false
+    "required": false,
+    "higher_is_worse": true
   }
 ]

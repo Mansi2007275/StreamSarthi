@@ -26,6 +26,7 @@ from app.services import photo_quality as pq
 from app.services.consistency import check_observation, is_strong_disagreement
 from app.services.db import RepoProtocol, get_repo, now_iso
 from app.services.indicators import get_indicator, load_indicators
+from app.services.one_health import compute_one_health
 from app.services.scoring import final_score
 from app.services.storage import StorageProtocol, get_storage, photo_path, process_image
 from app.services.trust import compute_trust
@@ -112,6 +113,7 @@ def _observation_out(obs: dict, answers: list[dict], storage: StorageProtocol | 
         trust_breakdown=obs.get("trust_breakdown"),
         review_note=obs.get("review_note"),
         reviewed_at=obs.get("reviewed_at"),
+        one_health=obs.get("one_health"),
         answers=[_answer_out(a, storage) for a in answers],
     )
 
@@ -276,6 +278,13 @@ def submit(
     trust = compute_trust(obs, answers, load_indicators(), observer_accuracy, issues)
 
     status = "needs_review" if trust["needs_review"] else "submitted"
+
+    one_health = None
+    try:
+        one_health = compute_one_health({**obs, "status": status}, answers, load_indicators())
+    except Exception:
+        logger.exception("one_health_failed", extra={"extra_fields": {"observation_id": obs_id}})
+
     obs = repo.update_observation(
         obs_id,
         {
@@ -283,6 +292,7 @@ def submit(
             "submitted_at": now_iso(),
             "trust_score": trust["score"],
             "trust_breakdown": trust,
+            "one_health": one_health,
         },
     )
 

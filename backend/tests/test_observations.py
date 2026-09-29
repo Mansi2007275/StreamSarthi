@@ -54,6 +54,8 @@ def test_full_v1_flow(as_user, storage):
     assert body["trust_score"] == 84.0
     assert body["trust_breakdown"]["needs_review"] is False
     assert body["trust_breakdown"]["components"]["A"] == 0.8
+    assert body["one_health"] is not None
+    assert body["one_health"]["level"] in ("good", "moderate", "poor")
 
     detail = c.get(f"/api/v1/observations/{obs['id']}").json()
     assert len(detail["answers"]) == len(REQUIRED)

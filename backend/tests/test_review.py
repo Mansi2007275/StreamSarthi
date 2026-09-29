@@ -68,6 +68,18 @@ def test_correct_sets_expert_score_and_keeps_human_score(as_user, repo):
     ans = next(a for a in r.json()["answers"] if a["indicator_id"] == ind_id)
     assert ans["expert_score"] == 4
     assert ans["human_score"] == 1
+    assert r.json()["one_health"]["based_on"] == "expert"
+
+
+def test_reject_sets_one_health_to_null(as_user, repo):
+    make_expert(repo)
+    obs_id, body = _submit(as_user, USER_A)
+    assert body["one_health"] is not None
+    r = as_user(USER_EXPERT).post(
+        f"/api/v1/review/{obs_id}", json={"action": "reject", "corrections": {}, "note": "bad photos"}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["one_health"] is None
 
 
 def test_correct_requires_nonempty_corrections(as_user, repo):
