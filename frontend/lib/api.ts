@@ -2,6 +2,10 @@ import { supabase } from "./supabase";
 import type {
   AuditResponse,
   Answer,
+  CalibrationAnswerResult,
+  CalibrationCompleteResult,
+  CalibrationItem,
+  Disagreement,
   Indicator,
   IndicatorResult,
   Lesson,
@@ -111,4 +115,10 @@ export const api = {
     if (params.limit !== undefined) q.set("limit", String(params.limit));
     return request<MapResponse>(`/api/v1/map?${q.toString()}`);
   },
+  calibrationItems: () => request<CalibrationItem[]>("/api/v1/calibration"),
+  calibrationAnswer: (id: string, score: number) =>
+    request<CalibrationAnswerResult>("/api/v1/calibration/answer", { method: "POST", json: { id, score } }),
+  calibrationComplete: (answers: Record<string, number>) =>
+    request<CalibrationCompleteResult>("/api/v1/calibration/complete", { method: "POST", json: { answers } }),
+  disagreement: () => request<Disagreement[]>("/api/v1/insights/disagreement"),
 };

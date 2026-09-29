@@ -119,6 +119,7 @@ export type Me = {
   display_name: string | null;
   role: Role;
   observer_accuracy: number | null;
+  calibrated_at: string | null;
 };
 
 // ---------- v3: expert review ----------
@@ -210,4 +211,36 @@ export type MapResponse = {
   points: MapPoint[];
   total: number;
   truncated: boolean;
+};
+
+// ---------- v5: calibration ----------
+export type CalibrationItem = {
+  id: string;
+  image: string;
+  indicator_id: string;
+};
+
+export type CalibrationAnswerResult = {
+  expert_score: number;
+  explanation: string;
+  correct: boolean;
+};
+
+export type CalibrationCompleteResult = {
+  accuracy: number;
+  calibrated_at: string;
+};
+
+// ---------- v5: disagreement heatmap ----------
+export type Disagreement = {
+  indicator_id: string;
+  label: string;
+  n: number;
+  mean_abs_diff: number | null;
+  mean_bias: number | null;
+  strong_rate: number | null;
+  human_wrong_rate: number | null;
+  ai_wrong_rate: number | null;
+  matrix: number[][];
+  scale: [number, number];
 };
