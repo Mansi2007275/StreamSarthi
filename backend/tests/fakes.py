@@ -176,6 +176,9 @@ class FakeRepo:
             if o["status"] in statuses and o.get("lat") is not None and o.get("lng") is not None
         ]
 
+    def list_all_answers(self):
+        return [dict(a) for a in self.answers.values()]
+
 
 class FakeStorage:
     def __init__(self):

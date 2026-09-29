@@ -44,6 +44,7 @@ class RepoProtocol(Protocol):
     def get_lesson(self, lesson_id: str) -> dict | None: ...
     def mark_lesson_seen(self, lesson_id: str) -> dict: ...
     def list_map_observations(self, statuses: list[str]) -> list[dict]: ...
+    def list_all_answers(self) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -220,6 +221,14 @@ class SupabaseRepo:
             .in_("status", statuses)
             .not_.is_("lat", "null")
             .not_.is_("lng", "null")
+            .execute()
+        )
+        return res.data or []
+
+    def list_all_answers(self):
+        res = (
+            self.db.table("indicator_answers")
+            .select("indicator_id, human_score, ai_score, ai_confidence, expert_score")
             .execute()
         )
         return res.data or []
