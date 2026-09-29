@@ -15,6 +15,10 @@ from supabase import Client, create_client
 from app.core.config import get_settings
 
 
+class AuditConflict(Exception):
+    """Raised by insert_audit_event on an (observation_id, prev_hash) race; callers retry once."""
+
+
 class RepoProtocol(Protocol):
     def ensure_profile(self, user_id: str, email: str | None) -> None: ...
     def create_observation(self, user_id: str, lat: float | None, lng: float | None) -> dict: ...
@@ -27,6 +31,13 @@ class RepoProtocol(Protocol):
     def list_answers(self, obs_id: str) -> list[dict]: ...
     def recent_phashes(self, user_id: str, exclude_obs_id: str, limit: int = 50) -> list[str]: ...
     def get_profile(self, user_id: str) -> dict | None: ...
+    def update_profile(self, user_id: str, fields: dict[str, Any]) -> dict: ...
+    def list_review_queue(
+        self, exclude_user_id: str, status: str, offset: int, limit: int
+    ) -> tuple[list[dict], int]: ...
+    def last_audit_event(self, obs_id: str) -> dict | None: ...
+    def insert_audit_event(self, row: dict[str, Any]) -> dict: ...
+    def list_audit_events(self, obs_id: str) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -111,6 +122,67 @@ class SupabaseRepo:
     def get_profile(self, user_id):
         res = self.db.table("profiles").select("*").eq("id", user_id).limit(1).execute()
         return res.data[0] if res.data else None
+
+    def update_profile(self, user_id, fields):
+        res = self.db.table("profiles").update(fields).eq("id", user_id).execute()
+        return res.data[0]
+
+    def list_review_queue(self, exclude_user_id, status, offset, limit):
+        res = (
+            self.db.table("observations")
+            .select(
+                "id, status, trust_score, trust_breakdown, submitted_at, lat, lng, user_id, "
+                "profiles!inner(display_name)",
+                count="exact",
+            )
+            .eq("status", status)
+            .neq("user_id", exclude_user_id)
+            .order("trust_score", desc=False, nullsfirst=True)
+            .order("submitted_at", desc=False)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        items = []
+        for r in res.data or []:
+            issues = (r.get("trust_breakdown") or {}).get("issues", [])
+            items.append(
+                {
+                    "id": r["id"],
+                    "status": r["status"],
+                    "trust_score": r.get("trust_score"),
+                    "submitted_at": r.get("submitted_at"),
+                    "lat": r.get("lat"),
+                    "lng": r.get("lng"),
+                    "flag_count": len(issues),
+                    "citizen_display_name": (r.get("profiles") or {}).get("display_name"),
+                }
+            )
+        return items, res.count or 0
+
+    def last_audit_event(self, obs_id):
+        res = (
+            self.db.table("audit_events")
+            .select("*")
+            .eq("observation_id", obs_id)
+            .order("id", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def insert_audit_event(self, row):
+        try:
+            res = self.db.table("audit_events").insert(row).execute()
+        except Exception as e:
+            msg = str(e).lower()
+            if "duplicate" in msg or "unique" in msg:
+                raise AuditConflict from e
+            raise
+        return res.data[0]
+
+    def list_audit_events(self, obs_id):
+        res = self.db.table("audit_events").select("*").eq("observation_id", obs_id).order("id").execute()
+        return res.data or []
 
 
 @lru_cache

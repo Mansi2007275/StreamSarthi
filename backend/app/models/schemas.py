@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -63,6 +64,7 @@ class AnswerOut(BaseModel):
     photo_url: str | None = None
     photo_quality: dict | None = None
     flags: list[str] = []
+    expert_score: int | None = None
 
 
 class IndicatorResult(BaseModel):
@@ -89,6 +91,8 @@ class ObservationOut(BaseModel):
     submitted_at: datetime | None = None
     trust_score: float | None = None
     trust_breakdown: dict | None = None
+    review_note: str | None = None
+    reviewed_at: datetime | None = None
     answers: list[AnswerOut] = []
 
 
@@ -107,3 +111,63 @@ class ObservationPage(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ---------- v3: roles ----------
+class MeOut(BaseModel):
+    id: str
+    email: str | None
+    display_name: str | None
+    role: str
+    observer_accuracy: float | None
+
+
+# ---------- v3: expert review ----------
+class ReviewAction(BaseModel):
+    action: Literal["approve", "correct", "reject"]
+    corrections: dict[str, int] = {}
+    note: str = Field(min_length=5, max_length=500)
+
+
+class ReviewQueueItem(BaseModel):
+    id: str
+    status: str
+    trust_score: float | None
+    submitted_at: datetime | None = None
+    lat: float | None
+    lng: float | None
+    flag_count: int
+    citizen_display_name: str | None
+
+
+class ReviewQueuePage(BaseModel):
+    items: list[ReviewQueueItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class ReviewDetail(ObservationOut):
+    citizen_display_name: str | None = None
+    citizen_observer_accuracy: float | None = None
+    audit_ok: bool = True
+
+
+# ---------- v3: audit log ----------
+class AuditEventOut(BaseModel):
+    event: str
+    actor_role: str
+    payload: dict
+    created_at: str
+    hash_short: str
+
+
+class AuditVerification(BaseModel):
+    valid: bool
+    broken_at: int | None
+    count: int
+
+
+class AuditResponse(BaseModel):
+    events: list[AuditEventOut]
+    verification: AuditVerification

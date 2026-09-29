@@ -1,6 +1,6 @@
 import uuid
 
-from app.services.db import now_iso
+from app.services.db import AuditConflict, now_iso
 
 
 class FakeRepo:
@@ -8,9 +8,20 @@ class FakeRepo:
         self.profiles: dict[str, dict] = {}
         self.observations: dict[str, dict] = {}
         self.answers: dict[tuple[str, str], dict] = {}
+        self.audit_events: dict[str, list[dict]] = {}
+        self._audit_seen: set[tuple[str, str]] = set()
+        self._audit_next_id = 1
 
     def ensure_profile(self, user_id, email):
-        self.profiles.setdefault(user_id, {"id": user_id, "role": "citizen", "observer_accuracy": 0.5})
+        self.profiles.setdefault(
+            user_id,
+            {
+                "id": user_id,
+                "role": "citizen",
+                "observer_accuracy": 0.5,
+                "display_name": (email or "user").split("@")[0],
+            },
+        )
 
     def create_observation(self, user_id, lat, lng):
         oid = str(uuid.uuid4())
@@ -73,6 +84,56 @@ class FakeRepo:
     def get_profile(self, user_id):
         p = self.profiles.get(user_id)
         return dict(p) if p else None
+
+    def update_profile(self, user_id, fields):
+        self.profiles[user_id].update(fields)
+        return dict(self.profiles[user_id])
+
+    def list_review_queue(self, exclude_user_id, status, offset, limit):
+        rows = [o for o in self.observations.values() if o["status"] == status and o["user_id"] != exclude_user_id]
+
+        def sort_key(o):
+            ts = o.get("trust_score")
+            return (float("-inf") if ts is None else ts, o.get("submitted_at") or "")
+
+        rows.sort(key=sort_key)
+        total = len(rows)
+        page = rows[offset : offset + limit]
+        items = []
+        for o in page:
+            issues = (o.get("trust_breakdown") or {}).get("issues", [])
+            profile = self.profiles.get(o["user_id"], {})
+            items.append(
+                {
+                    "id": o["id"],
+                    "status": o["status"],
+                    "trust_score": o.get("trust_score"),
+                    "submitted_at": o.get("submitted_at"),
+                    "lat": o.get("lat"),
+                    "lng": o.get("lng"),
+                    "flag_count": len(issues),
+                    "citizen_display_name": profile.get("display_name"),
+                }
+            )
+        return items, total
+
+    def last_audit_event(self, obs_id):
+        events = self.audit_events.get(obs_id) or []
+        return dict(events[-1]) if events else None
+
+    def insert_audit_event(self, row):
+        key = (row["observation_id"], row["prev_hash"])
+        if key in self._audit_seen:
+            raise AuditConflict
+        row = dict(row)
+        row["id"] = self._audit_next_id
+        self._audit_next_id += 1
+        self._audit_seen.add(key)
+        self.audit_events.setdefault(row["observation_id"], []).append(row)
+        return dict(row)
+
+    def list_audit_events(self, obs_id):
+        return [dict(e) for e in self.audit_events.get(obs_id, [])]
 
 
 class FakeStorage:
