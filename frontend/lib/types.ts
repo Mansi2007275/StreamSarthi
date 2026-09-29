@@ -52,6 +52,7 @@ export type Answer = {
   photo_url: string | null;
   photo_quality: PhotoQuality | null;
   flags: string[];
+  expert_score: number | null;
 };
 
 export type TrustIssue = {
@@ -80,11 +81,78 @@ export type ObservationSummary = {
   trust_score: number | null;
 };
 
-export type Observation = ObservationSummary & { answers: Answer[]; trust_breakdown: TrustBreakdown | null };
+export type Observation = ObservationSummary & {
+  answers: Answer[];
+  trust_breakdown: TrustBreakdown | null;
+  review_note: string | null;
+  reviewed_at: string | null;
+};
 
 export type ObservationPage = {
   items: ObservationSummary[];
   total: number;
   offset: number;
   limit: number;
+};
+
+// ---------- v3: roles ----------
+export type Role = "citizen" | "expert" | "admin";
+
+export type Me = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  role: Role;
+  observer_accuracy: number | null;
+};
+
+// ---------- v3: expert review ----------
+export type ReviewQueueItem = {
+  id: string;
+  status: ObservationStatus;
+  trust_score: number | null;
+  submitted_at: string | null;
+  lat: number | null;
+  lng: number | null;
+  flag_count: number;
+  citizen_display_name: string | null;
+};
+
+export type ReviewQueuePage = {
+  items: ReviewQueueItem[];
+  total: number;
+  offset: number;
+  limit: number;
+};
+
+export type ReviewDetail = Observation & {
+  citizen_display_name: string | null;
+  citizen_observer_accuracy: number | null;
+  audit_ok: boolean;
+};
+
+export type ReviewActionBody = {
+  action: "approve" | "correct" | "reject";
+  corrections: Record<string, number>;
+  note: string;
+};
+
+// ---------- v3: audit log ----------
+export type AuditEvent = {
+  event: string;
+  actor_role: "citizen" | "expert" | "system";
+  payload: Record<string, unknown>;
+  created_at: string;
+  hash_short: string;
+};
+
+export type AuditVerification = {
+  valid: boolean;
+  broken_at: number | null;
+  count: number;
+};
+
+export type AuditResponse = {
+  events: AuditEvent[];
+  verification: AuditVerification;
 };

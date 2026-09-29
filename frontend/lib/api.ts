@@ -1,5 +1,16 @@
 import { supabase } from "./supabase";
-import type { Indicator, IndicatorResult, Answer, Observation, ObservationPage } from "./types";
+import type {
+  AuditResponse,
+  Answer,
+  Indicator,
+  IndicatorResult,
+  Me,
+  Observation,
+  ObservationPage,
+  ReviewActionBody,
+  ReviewDetail,
+  ReviewQueuePage,
+} from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
@@ -80,4 +91,11 @@ export const api = {
   submit: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}/submit`, { method: "POST" }),
   mine: (offset = 0, limit = 20) => request<ObservationPage>(`/api/v1/observations/mine?offset=${offset}&limit=${limit}`),
   observation: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}`),
+  observationAudit: (obsId: string) => request<AuditResponse>(`/api/v1/observations/${obsId}/audit`),
+  me: () => request<Me>("/api/v1/me"),
+  reviewQueue: (status: "needs_review" | "submitted", offset = 0, limit = 20) =>
+    request<ReviewQueuePage>(`/api/v1/review/queue?status=${status}&offset=${offset}&limit=${limit}`),
+  reviewDetail: (obsId: string) => request<ReviewDetail>(`/api/v1/review/${obsId}`),
+  reviewAction: (obsId: string, body: ReviewActionBody) =>
+    request<ReviewDetail>(`/api/v1/review/${obsId}`, { method: "POST", json: body }),
 };
