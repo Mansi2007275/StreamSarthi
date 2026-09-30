@@ -4,22 +4,27 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import AuditTimeline from "@/components/AuditTimeline";
 import AuthGuard from "@/components/AuthGuard";
+import OneHealthCard from "@/components/OneHealthCard";
 import StatusBadge from "@/components/StatusBadge";
+import TrustCard from "@/components/TrustCard";
 import { api, friendlyMessage } from "@/lib/api";
-import type { Indicator, Observation } from "@/lib/types";
+import type { AuditResponse, Indicator, Observation } from "@/lib/types";
 
 function Detail() {
   const { id } = useParams<{ id: string }>();
   const [obs, setObs] = useState<Observation | null>(null);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
+  const [audit, setAudit] = useState<AuditResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.observation(id), api.indicators()])
-      .then(([o, inds]) => {
+    Promise.all([api.observation(id), api.indicators(), api.observationAudit(id)])
+      .then(([o, inds, a]) => {
         setObs(o);
         setIndicators(inds);
+        setAudit(a);
       })
       .catch((e) => setError(friendlyMessage(e)));
   }, [id]);
@@ -58,6 +63,20 @@ function Detail() {
         </p>
       </div>
 
+      <TrustCard trust={obs.trust_breakdown} />
+      <OneHealthCard oneHealth={obs.one_health} />
+
+      {obs.review_note && (
+        <div className="rounded-2xl border border-line bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Expert review</h2>
+            <StatusBadge status={obs.status} />
+          </div>
+          <p className="mt-2 text-sm">{obs.review_note}</p>
+          {obs.reviewed_at && <p className="mt-1 text-xs text-muted">{new Date(obs.reviewed_at).toLocaleString()}</p>}
+        </div>
+      )}
+
       {obs.answers.length === 0 && <p className="text-muted">No answers saved yet.</p>}
 
       {obs.answers.map((a) => (
@@ -79,6 +98,12 @@ function Detail() {
                   )}
                 </dd>
               </div>
+              {a.expert_score !== null && (
+                <div className="rounded-lg bg-brand-50 p-2">
+                  <dt className="text-xs text-muted">Expert</dt>
+                  <dd>{labelOf(a.indicator_id, a.expert_score)}</dd>
+                </div>
+              )}
             </dl>
             <p className="text-sm">
               <span className="text-muted">Final: </span>
@@ -86,9 +111,20 @@ function Detail() {
               <span className="text-muted"> ({a.used_ai_answer ? "used AI's answer" : "kept own answer"})</span>
             </p>
             {a.ai_reason && <p className="text-sm text-muted">AI: {a.ai_reason}</p>}
+            {a.flags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {a.flags.map((f) => (
+                  <span key={f} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+                    {f.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </article>
       ))}
+
+      {audit && <AuditTimeline events={audit.events} verification={audit.verification} indicators={indicators} />}
     </div>
   );
 }

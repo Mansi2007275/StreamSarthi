@@ -7,6 +7,7 @@ import StepCard from "@/components/StepCard";
 import PhotoCapture from "@/components/PhotoCapture";
 import ScalePicker from "@/components/ScalePicker";
 import AISecondOpinion from "@/components/AISecondOpinion";
+import PhotoQualityWarning from "@/components/PhotoQualityWarning";
 import { useToast } from "@/components/Toast";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Indicator, IndicatorResult } from "@/lib/types";
@@ -137,8 +138,12 @@ function Assess() {
   async function submit() {
     setBusy(true);
     try {
-      await api.submit(obsId!);
-      toast("success", "Observation submitted. Thank you!");
+      const result = await api.submit(obsId!);
+      if (result.status === "needs_review") {
+        toast("info", "Submitted. An expert will double-check this one.");
+      } else {
+        toast("success", "Observation submitted. Thank you!");
+      }
       router.push(`/observations/${obsId}`);
     } catch (e) {
       toast("error", friendlyMessage(e));
@@ -191,6 +196,8 @@ function Assess() {
         )}
 
         {busy && !d.result && <div className="skeleton h-40" />}
+
+        {d.result && d.result.flags.length > 0 && <PhotoQualityWarning flags={d.result.flags} />}
 
         {d.result && (
           <AISecondOpinion

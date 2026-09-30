@@ -1,14 +1,18 @@
+import logging
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import CurrentUser, get_current_user
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError, not_found
+from app.core.logging import log_event
 from app.core.ratelimit import RateLimiter
 from app.models.schemas import (
     AnswerChoice,
     AnswerOut,
+    AuditResponse,
     Indicator,
     IndicatorResult,
     ObservationCreate,
@@ -17,12 +21,27 @@ from app.models.schemas import (
     ObservationPage,
     ObservationSummary,
 )
-from app.services import ai_opinion
+from app.services import ai_opinion, audit
+from app.services import photo_quality as pq
+from app.services.consistency import check_observation, is_strong_disagreement
 from app.services.db import RepoProtocol, get_repo, now_iso
 from app.services.indicators import get_indicator, load_indicators
+from app.services.one_health import compute_one_health
+from app.services.scoring import final_score
 from app.services.storage import StorageProtocol, get_storage, photo_path, process_image
+from app.services.trust import compute_trust
+
+logger = logging.getLogger("streamsaathi")
 
 router = APIRouter(prefix="/api/v1", tags=["observations"])
+
+
+def _audit_best_effort(repo: RepoProtocol, obs_id: str, actor_id: str, event: str, payload: dict) -> None:
+    """Citizen-flow audit writes are best-effort: they must never block a citizen action."""
+    try:
+        audit.append_event(repo, obs_id, actor_id, event, payload)
+    except Exception:
+        logger.exception("audit_failed", extra={"extra_fields": {"observation_id": obs_id, "event": event}})
 
 
 @lru_cache
@@ -62,12 +81,6 @@ def _check_score(score: int | None, ind: Indicator) -> None:
         raise AppError(422, "VALIDATION_ERROR", f"human_score must be between {lo} and {hi}")
 
 
-def final_score(ans: dict) -> int | None:
-    if ans.get("used_ai_answer") and ans.get("ai_score") is not None:
-        return ans["ai_score"]
-    return ans.get("human_score")
-
-
 def _answer_out(ans: dict, storage: StorageProtocol | None = None) -> AnswerOut:
     url = storage.signed_url(ans["photo_path"]) if storage and ans.get("photo_path") else None
     return AnswerOut(
@@ -80,6 +93,9 @@ def _answer_out(ans: dict, storage: StorageProtocol | None = None) -> AnswerOut:
         used_ai_answer=bool(ans.get("used_ai_answer")),
         final_score=final_score(ans),
         photo_url=url,
+        photo_quality=ans.get("photo_quality"),
+        flags=ans.get("flags") or [],
+        expert_score=ans.get("expert_score"),
     )
 
 
@@ -94,6 +110,10 @@ def _observation_out(obs: dict, answers: list[dict], storage: StorageProtocol | 
         created_at=obs.get("created_at"),
         submitted_at=obs.get("submitted_at"),
         trust_score=obs.get("trust_score"),
+        trust_breakdown=obs.get("trust_breakdown"),
+        review_note=obs.get("review_note"),
+        reviewed_at=obs.get("reviewed_at"),
+        one_health=obs.get("one_health"),
         answers=[_answer_out(a, storage) for a in answers],
     )
 
@@ -117,6 +137,7 @@ def create_observation(
 ):
     repo.ensure_profile(user.id, user.email)
     obs = repo.create_observation(user.id, body.lat, body.lng)
+    _audit_best_effort(repo, obs["id"], user.id, "observation_created", {"lat": body.lat, "lng": body.lng})
     return ObservationCreated(id=obs["id"], status=obs["status"])
 
 
@@ -147,6 +168,8 @@ async def answer_indicator(
         "used_ai_answer": False,
     }
     opinion = ai_opinion.FALLBACK.model_copy(update={"reason": "No photo, so no AI opinion"})
+    quality: dict | None = None
+    flags: list[str] = []
 
     if photo is not None:
         clean = process_image(await photo.read(), photo.content_type, settings.max_upload_mb)
@@ -157,6 +180,14 @@ async def answer_indicator(
             raise AppError(502, "STORAGE_ERROR", "Could not save the photo, please retry") from e
         row["photo_path"] = path
 
+        try:
+            previous_hashes = repo.recent_phashes(user.id, obs_id)
+            quality = await run_in_threadpool(pq.check_quality, clean, previous_hashes)
+            flags = pq.quality_flags(quality)
+        except Exception:
+            logger.exception("photo_quality_failed")
+            quality, flags = None, []
+
         limiter.check(user.id)
         opinion = await ai_opinion.get_opinion(clean, ind, settings)
 
@@ -165,8 +196,19 @@ async def answer_indicator(
         ai_confidence=opinion.confidence,
         ai_reason=opinion.reason,
         ai_evidence=opinion.visible_evidence,
+        photo_quality=quality,
+        flags=flags,
     )
     repo.upsert_answer(row)  # unique(observation_id, indicator_id) -> retake overwrites, no duplicates
+
+    if opinion.suggested_score is not None:
+        _audit_best_effort(
+            repo,
+            obs_id,
+            user.id,
+            "ai_suggested",
+            {"indicator": indicator_id, "ai_score": opinion.suggested_score, "confidence": opinion.confidence},
+        )
 
     return IndicatorResult(
         indicator_id=indicator_id,
@@ -177,6 +219,8 @@ async def answer_indicator(
         evidence=opinion.visible_evidence,
         can_assess=opinion.can_assess,
         retake_tip=opinion.retake_tip,
+        photo_quality=quality,
+        flags=flags,
     )
 
 
@@ -201,7 +245,16 @@ def choose_answer(
     if body.human_score is not None:
         _check_score(body.human_score, ind)
         fields["human_score"] = body.human_score
-    return _answer_out(repo.update_answer(obs_id, indicator_id, fields))
+    updated = repo.update_answer(obs_id, indicator_id, fields)
+    event = "human_used_ai" if body.used_ai_answer else "human_kept_own"
+    _audit_best_effort(
+        repo,
+        obs_id,
+        user.id,
+        event,
+        {"indicator": indicator_id, "human_score": updated.get("human_score"), "ai_score": updated.get("ai_score")},
+    )
+    return _answer_out(updated)
 
 
 @router.post("/observations/{obs_id}/submit", response_model=ObservationOut)
@@ -219,8 +272,45 @@ def submit(
     if missing:
         raise AppError(422, "MISSING_INDICATORS", "Please answer: " + ", ".join(missing))
 
-    # v2: compute trust score here and route to needs_review when low.
-    obs = repo.update_observation(obs_id, {"status": "submitted", "submitted_at": now_iso()})
+    issues = check_observation(obs, answers)
+    profile = repo.get_profile(user.id)
+    observer_accuracy = profile.get("observer_accuracy") if profile else None
+    trust = compute_trust(obs, answers, load_indicators(), observer_accuracy, issues)
+
+    status = "needs_review" if trust["needs_review"] else "submitted"
+
+    one_health = None
+    try:
+        one_health = compute_one_health({**obs, "status": status}, answers, load_indicators())
+    except Exception:
+        logger.exception("one_health_failed", extra={"extra_fields": {"observation_id": obs_id}})
+
+    obs = repo.update_observation(
+        obs_id,
+        {
+            "status": status,
+            "submitted_at": now_iso(),
+            "trust_score": trust["score"],
+            "trust_breakdown": trust,
+            "one_health": one_health,
+        },
+    )
+
+    for a in answers:
+        if is_strong_disagreement(a):
+            existing = list(a.get("flags") or [])
+            if "strong_disagreement" not in existing:
+                repo.update_answer(obs_id, a["indicator_id"], {"flags": existing + ["strong_disagreement"]})
+
+    _audit_best_effort(repo, obs_id, user.id, "submitted", {"trust_score": trust["score"]})
+    if issues:
+        _audit_best_effort(repo, obs_id, user.id, "flagged", {"issues": [i["code"] for i in issues]})
+    if trust["needs_review"]:
+        _audit_best_effort(repo, obs_id, user.id, "routed_to_review", {"trust_score": trust["score"]})
+
+    log_event("trust_computed", observation_id=obs_id, score=trust["score"], needs_review=trust["needs_review"])
+
+    answers = repo.list_answers(obs_id)  # refreshed, so the response reflects the new flags
     return _observation_out(obs, answers, storage)
 
 
@@ -246,3 +336,44 @@ def observation_detail(
 ):
     obs = _own_observation(repo, obs_id, user)
     return _observation_out(obs, repo.list_answers(obs_id), storage)
+
+
+@router.get("/observations/{obs_id}/audit", response_model=AuditResponse)
+def observation_audit(
+    obs_id: str,
+    user: CurrentUser = Depends(_user),
+    repo: RepoProtocol = Depends(get_repo),
+):
+    obs = repo.get_observation(obs_id)
+    if not obs:
+        raise not_found("Observation")
+    profile = repo.get_profile(user.id)
+    is_owner = obs["user_id"] == user.id
+    is_reviewer = bool(profile and profile.get("role") in ("expert", "admin"))
+    if not is_owner and not is_reviewer:
+        raise not_found("Observation")
+
+    events = repo.list_audit_events(obs_id)
+    verification = audit.verify_chain(events)
+
+    role_cache: dict[str, str] = {}
+
+    def role_of(actor_id: str | None) -> str:
+        if actor_id is None:
+            return "system"
+        if actor_id not in role_cache:
+            p = repo.get_profile(actor_id)
+            role_cache[actor_id] = (p or {}).get("role", "citizen")
+        return role_cache[actor_id]
+
+    out_events = [
+        {
+            "event": e["event"],
+            "actor_role": role_of(e.get("actor_id")),
+            "payload": e["payload"],
+            "created_at": e["created_at"],
+            "hash_short": f"{e['hash'][:6]}...{e['hash'][-4:]}",
+        }
+        for e in events
+    ]
+    return AuditResponse(events=out_events, verification=verification)

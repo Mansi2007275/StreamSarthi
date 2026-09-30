@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
+import LessonCard from "@/components/LessonCard";
 import StatusBadge from "@/components/StatusBadge";
 import { api, friendlyMessage } from "@/lib/api";
+import { useMe } from "@/lib/useMe";
 import type { ObservationPage } from "@/lib/types";
 
 function Dashboard() {
   const [page, setPage] = useState<ObservationPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const me = useMe();
 
   useEffect(() => {
     api.mine(0, 3).then(setPage).catch((e) => setError(friendlyMessage(e)));
@@ -29,6 +32,19 @@ function Dashboard() {
           + New assessment
         </Link>
       </section>
+
+      {me && !me.calibrated_at && (
+        <Link href="/calibrate" className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <span className="text-sm text-amber-900">
+            <span className="font-semibold">New here?</span> Take the 2-minute practice first.
+          </span>
+          <span aria-hidden className="text-amber-700">
+            →
+          </span>
+        </Link>
+      )}
+
+      <LessonCard />
 
       <section>
         <div className="mb-2 flex items-center justify-between">

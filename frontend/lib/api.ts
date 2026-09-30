@@ -1,5 +1,23 @@
 import { supabase } from "./supabase";
-import type { Indicator, IndicatorResult, Answer, Observation, ObservationPage } from "./types";
+import type {
+  AuditResponse,
+  Answer,
+  CalibrationAnswerResult,
+  CalibrationCompleteResult,
+  CalibrationItem,
+  Disagreement,
+  Indicator,
+  IndicatorResult,
+  Lesson,
+  LessonsPage,
+  MapResponse,
+  Me,
+  Observation,
+  ObservationPage,
+  ReviewActionBody,
+  ReviewDetail,
+  ReviewQueuePage,
+} from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
@@ -80,4 +98,27 @@ export const api = {
   submit: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}/submit`, { method: "POST" }),
   mine: (offset = 0, limit = 20) => request<ObservationPage>(`/api/v1/observations/mine?offset=${offset}&limit=${limit}`),
   observation: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}`),
+  observationAudit: (obsId: string) => request<AuditResponse>(`/api/v1/observations/${obsId}/audit`),
+  me: () => request<Me>("/api/v1/me"),
+  reviewQueue: (status: "needs_review" | "submitted", offset = 0, limit = 20) =>
+    request<ReviewQueuePage>(`/api/v1/review/queue?status=${status}&offset=${offset}&limit=${limit}`),
+  reviewDetail: (obsId: string) => request<ReviewDetail>(`/api/v1/review/${obsId}`),
+  reviewAction: (obsId: string, body: ReviewActionBody) =>
+    request<ReviewDetail>(`/api/v1/review/${obsId}`, { method: "POST", json: body }),
+  lessons: (unseen = false, limit = 5) => request<LessonsPage>(`/api/v1/lessons?unseen=${unseen}&limit=${limit}`),
+  markLessonSeen: (lessonId: string) => request<Lesson>(`/api/v1/lessons/${lessonId}/seen`, { method: "POST" }),
+  map: (params: { minTrust?: number; status?: string[]; bbox?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.minTrust !== undefined) q.set("min_trust", String(params.minTrust));
+    if (params.status?.length) q.set("status", params.status.join(","));
+    if (params.bbox) q.set("bbox", params.bbox);
+    if (params.limit !== undefined) q.set("limit", String(params.limit));
+    return request<MapResponse>(`/api/v1/map?${q.toString()}`);
+  },
+  calibrationItems: () => request<CalibrationItem[]>("/api/v1/calibration"),
+  calibrationAnswer: (id: string, score: number) =>
+    request<CalibrationAnswerResult>("/api/v1/calibration/answer", { method: "POST", json: { id, score } }),
+  calibrationComplete: (answers: Record<string, number>) =>
+    request<CalibrationCompleteResult>("/api/v1/calibration/complete", { method: "POST", json: { answers } }),
+  disagreement: () => request<Disagreement[]>("/api/v1/insights/disagreement"),
 };

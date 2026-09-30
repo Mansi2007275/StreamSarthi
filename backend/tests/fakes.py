@@ -1,6 +1,6 @@
 import uuid
 
-from app.services.db import now_iso
+from app.services.db import AuditConflict, now_iso
 
 
 class FakeRepo:
@@ -8,9 +8,23 @@ class FakeRepo:
         self.profiles: dict[str, dict] = {}
         self.observations: dict[str, dict] = {}
         self.answers: dict[tuple[str, str], dict] = {}
+        self.audit_events: dict[str, list[dict]] = {}
+        self._audit_seen: set[tuple[str, str]] = set()
+        self._audit_next_id = 1
+        self.lessons: dict[str, dict] = {}
+        self._lesson_by_key: dict[tuple[str, str], str] = {}
+        self._lesson_next_id = 1
 
     def ensure_profile(self, user_id, email):
-        self.profiles.setdefault(user_id, {"id": user_id, "role": "citizen"})
+        self.profiles.setdefault(
+            user_id,
+            {
+                "id": user_id,
+                "role": "citizen",
+                "observer_accuracy": 0.5,
+                "display_name": (email or "user").split("@")[0],
+            },
+        )
 
     def create_observation(self, user_id, lat, lng):
         oid = str(uuid.uuid4())
@@ -60,6 +74,110 @@ class FakeRepo:
 
     def list_answers(self, obs_id):
         return [dict(a) for (o, _), a in self.answers.items() if o == obs_id]
+
+    def recent_phashes(self, user_id, exclude_obs_id, limit=50):
+        obs_ids = {o["id"] for o in self.observations.values() if o["user_id"] == user_id and o["id"] != exclude_obs_id}
+        hashes = [
+            a["photo_quality"]["phash"]
+            for (oid, _), a in reversed(list(self.answers.items()))
+            if oid in obs_ids and a.get("photo_quality")
+        ]
+        return hashes[:limit]
+
+    def get_profile(self, user_id):
+        p = self.profiles.get(user_id)
+        return dict(p) if p else None
+
+    def update_profile(self, user_id, fields):
+        self.profiles[user_id].update(fields)
+        return dict(self.profiles[user_id])
+
+    def list_review_queue(self, exclude_user_id, status, offset, limit):
+        rows = [o for o in self.observations.values() if o["status"] == status and o["user_id"] != exclude_user_id]
+
+        def sort_key(o):
+            ts = o.get("trust_score")
+            return (float("-inf") if ts is None else ts, o.get("submitted_at") or "")
+
+        rows.sort(key=sort_key)
+        total = len(rows)
+        page = rows[offset : offset + limit]
+        items = []
+        for o in page:
+            issues = (o.get("trust_breakdown") or {}).get("issues", [])
+            profile = self.profiles.get(o["user_id"], {})
+            items.append(
+                {
+                    "id": o["id"],
+                    "status": o["status"],
+                    "trust_score": o.get("trust_score"),
+                    "submitted_at": o.get("submitted_at"),
+                    "lat": o.get("lat"),
+                    "lng": o.get("lng"),
+                    "flag_count": len(issues),
+                    "citizen_display_name": profile.get("display_name"),
+                }
+            )
+        return items, total
+
+    def last_audit_event(self, obs_id):
+        events = self.audit_events.get(obs_id) or []
+        return dict(events[-1]) if events else None
+
+    def insert_audit_event(self, row):
+        key = (row["observation_id"], row["prev_hash"])
+        if key in self._audit_seen:
+            raise AuditConflict
+        row = dict(row)
+        row["id"] = self._audit_next_id
+        self._audit_next_id += 1
+        self._audit_seen.add(key)
+        self.audit_events.setdefault(row["observation_id"], []).append(row)
+        return dict(row)
+
+    def list_audit_events(self, obs_id):
+        return [dict(e) for e in self.audit_events.get(obs_id, [])]
+
+    def upsert_lesson(self, row):
+        key = (row["observation_id"], row["indicator_id"])
+        lid = self._lesson_by_key.get(key)
+        if lid is None:
+            lid = str(self._lesson_next_id)
+            self._lesson_next_id += 1
+            self._lesson_by_key[key] = lid
+            self.lessons[lid] = {"id": lid, "seen": False, "seen_at": None, "created_at": now_iso()}
+        self.lessons[lid].update(row)
+        self.lessons[lid]["id"] = lid
+        return dict(self.lessons[lid])
+
+    def list_lessons(self, user_id, unseen_only, limit):
+        rows = [lesson for lesson in self.lessons.values() if lesson["user_id"] == user_id]
+        if unseen_only:
+            rows = [lesson for lesson in rows if not lesson["seen"]]
+        rows.sort(key=lambda lesson: lesson["created_at"], reverse=True)
+        return [dict(lesson) for lesson in rows[:limit]]
+
+    def count_unseen_lessons(self, user_id):
+        return sum(1 for lesson in self.lessons.values() if lesson["user_id"] == user_id and not lesson["seen"])
+
+    def get_lesson(self, lesson_id):
+        lesson = self.lessons.get(lesson_id)
+        return dict(lesson) if lesson else None
+
+    def mark_lesson_seen(self, lesson_id):
+        self.lessons[lesson_id]["seen"] = True
+        self.lessons[lesson_id]["seen_at"] = now_iso()
+        return dict(self.lessons[lesson_id])
+
+    def list_map_observations(self, statuses):
+        return [
+            dict(o)
+            for o in self.observations.values()
+            if o["status"] in statuses and o.get("lat") is not None and o.get("lng") is not None
+        ]
+
+    def list_all_answers(self):
+        return [dict(a) for a in self.answers.values()]
 
 
 class FakeStorage:

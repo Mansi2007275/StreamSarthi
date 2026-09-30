@@ -18,6 +18,16 @@ from tests.fakes import FakeRepo, FakeStorage  # noqa: E402
 
 USER_A = CurrentUser(id="user-a", email="a@test.com")
 USER_B = CurrentUser(id="user-b", email="b@test.com")
+USER_EXPERT = CurrentUser(id="user-expert", email="expert@test.com")
+
+
+def make_expert(repo, user_id: str = USER_EXPERT.id) -> None:
+    repo.profiles[user_id] = {
+        "id": user_id,
+        "role": "expert",
+        "observer_accuracy": 0.5,
+        "display_name": "expert",
+    }
 
 
 @pytest.fixture
@@ -43,7 +53,20 @@ def as_user(repo, storage, monkeypatch):
             can_assess=True,
         )
 
+    def fake_quality(jpeg, previous_hashes):
+        return {
+            "blur_score": 500.0,
+            "brightness": 128.0,
+            "phash": "0" * 16,
+            "is_blurry": False,
+            "is_dark": False,
+            "is_overexposed": False,
+            "is_duplicate": False,
+            "score": 1.0,
+        }
+
     monkeypatch.setattr(obs_router.ai_opinion, "get_opinion", fake_opinion)
+    monkeypatch.setattr(obs_router.pq, "check_quality", fake_quality)
     app.dependency_overrides[get_repo] = lambda: repo
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[obs_router.get_ai_limiter] = lambda: RateLimiter(1000)

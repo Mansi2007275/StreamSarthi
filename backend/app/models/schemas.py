@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,7 @@ class Indicator(BaseModel):
     scale_labels: list[str]
     photo_required: bool = True
     required: bool = True
+    higher_is_worse: bool = True
 
 
 # ---------- AI ----------
@@ -61,6 +63,9 @@ class AnswerOut(BaseModel):
     used_ai_answer: bool = False
     final_score: int | None = None
     photo_url: str | None = None
+    photo_quality: dict | None = None
+    flags: list[str] = []
+    expert_score: int | None = None
 
 
 class IndicatorResult(BaseModel):
@@ -74,6 +79,8 @@ class IndicatorResult(BaseModel):
     evidence: list[str]
     can_assess: bool
     retake_tip: str
+    photo_quality: dict | None = None
+    flags: list[str] = []
 
 
 class ObservationOut(BaseModel):
@@ -84,6 +91,10 @@ class ObservationOut(BaseModel):
     created_at: datetime | None = None
     submitted_at: datetime | None = None
     trust_score: float | None = None
+    trust_breakdown: dict | None = None
+    review_note: str | None = None
+    reviewed_at: datetime | None = None
+    one_health: dict | None = None
     answers: list[AnswerOut] = []
 
 
@@ -102,3 +113,145 @@ class ObservationPage(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ---------- v3: roles ----------
+class MeOut(BaseModel):
+    id: str
+    email: str | None
+    display_name: str | None
+    role: str
+    observer_accuracy: float | None
+    calibrated_at: str | None = None
+
+
+# ---------- v3: expert review ----------
+class ReviewAction(BaseModel):
+    action: Literal["approve", "correct", "reject"]
+    corrections: dict[str, int] = {}
+    note: str = Field(min_length=5, max_length=500)
+
+
+class ReviewQueueItem(BaseModel):
+    id: str
+    status: str
+    trust_score: float | None
+    submitted_at: datetime | None = None
+    lat: float | None
+    lng: float | None
+    flag_count: int
+    citizen_display_name: str | None
+
+
+class ReviewQueuePage(BaseModel):
+    items: list[ReviewQueueItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class ReviewDetail(ObservationOut):
+    citizen_display_name: str | None = None
+    citizen_observer_accuracy: float | None = None
+    audit_ok: bool = True
+
+
+# ---------- v3: audit log ----------
+class AuditEventOut(BaseModel):
+    event: str
+    actor_role: str
+    payload: dict
+    created_at: str
+    hash_short: str
+
+
+class AuditVerification(BaseModel):
+    valid: bool
+    broken_at: int | None
+    count: int
+
+
+class AuditResponse(BaseModel):
+    events: list[AuditEventOut]
+    verification: AuditVerification
+
+
+# ---------- v4: micro-lessons ----------
+class LessonOut(BaseModel):
+    id: str
+    observation_id: str
+    indicator_id: str
+    indicator_label: str
+    your_score: int | None
+    your_label: str | None
+    expert_score: int
+    expert_label: str | None
+    why: str
+    tip: str
+    created_at: str | None
+    seen: bool
+
+
+class LessonsPage(BaseModel):
+    items: list[LessonOut]
+    unseen_count: int
+
+
+# ---------- v4: map ----------
+class MapPointOut(BaseModel):
+    id: str
+    lat: float
+    lng: float
+    trust_score: float | None
+    status: str
+    one_health_level: str | None
+    submitted_at: str | None
+    is_mine: bool
+    can_open: bool
+
+
+class MapResponse(BaseModel):
+    points: list[MapPointOut]
+    total: int
+    truncated: bool
+
+
+# ---------- v5: calibration ----------
+class CalibrationItemOut(BaseModel):
+    id: str
+    image: str
+    indicator_id: str
+
+
+class CalibrationAnswerIn(BaseModel):
+    id: str
+    score: int
+
+
+class CalibrationAnswerOut(BaseModel):
+    expert_score: int
+    explanation: str
+    correct: bool
+
+
+class CalibrationCompleteIn(BaseModel):
+    answers: dict[str, int]
+
+
+class CalibrationCompleteOut(BaseModel):
+    accuracy: float
+    calibrated_at: str
+
+
+# ---------- v5: disagreement heatmap ----------
+class DisagreementOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    mean_abs_diff: float | None
+    mean_bias: float | None
+    strong_rate: float | None
+    human_wrong_rate: float | None
+    ai_wrong_rate: float | None
+    matrix: list[list[int]]
+    scale: list[int]
