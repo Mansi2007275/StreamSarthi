@@ -23,6 +23,8 @@ class Indicator(BaseModel):
     photo_required: bool = True
     required: bool = True
     higher_is_worse: bool = True
+    # 1-2 discriminating questions, shown when the citizen and the AI disagree. Config, never LLM-generated.
+    cross_exam: list[str] = []
 
 
 # ---------- AI ----------

@@ -61,7 +61,7 @@ def test_payloads_never_contain_an_email():
     repo = FakeRepo()
     audit.append_event(repo, "obs-1", "actor-1", "observation_created", {"lat": 1.0, "lng": 2.0})
     audit.append_event(
-        repo, "obs-1", "actor-1", "ai_suggested", {"indicator": "water_appearance", "ai_score": 3, "confidence": 0.8}
+        repo, "obs-1", "actor-1", "ai_suggested", {"indicator": "water_colour", "ai_score": 3, "confidence": 0.8}
     )
     events = repo.list_audit_events("obs-1")
     for e in events:

@@ -1,67 +1,138 @@
 [
   {
-    "id": "water_appearance",
-    "label": "Water appearance",
-    "help": {
-      "en": "How clear or murky is the water?",
-      "hi": "Paani kitna saaf ya dhundhla hai?"
-    },
-    "scale": [1, 5],
-    "scale_labels": ["Very clear", "Clear", "Slightly cloudy", "Cloudy", "Very murky"],
-    "photo_required": true,
-    "required": true,
-    "higher_is_worse": true
-  },
-  {
-    "id": "litter",
-    "label": "Litter and waste",
-    "help": {
-      "en": "How much plastic, trash or waste can you see in or near the water?",
-      "hi": "Paani mein ya kinare pe kitna plastic ya kachra dikh raha hai?"
-    },
-    "scale": [1, 5],
-    "scale_labels": ["None", "A little", "Some", "A lot", "Covered in waste"],
-    "photo_required": true,
-    "required": true,
-    "higher_is_worse": true
-  },
-  {
-    "id": "bank_vegetation",
-    "label": "Bank vegetation",
-    "help": {
-      "en": "How much natural plant cover is on the stream banks?",
-      "hi": "Kinaron pe kitni hariyali / paudhe hain?"
-    },
-    "scale": [1, 5],
-    "scale_labels": ["Dense natural cover", "Mostly covered", "Patchy", "Sparse", "Bare or concrete"],
-    "photo_required": true,
-    "required": true,
-    "higher_is_worse": true
-  },
-  {
-    "id": "foam_or_film",
-    "label": "Foam, oil or surface film",
-    "help": {
-      "en": "Do you see foam, oily shine or a film on the water surface?",
-      "hi": "Paani ki satah pe jhaag, tel ki chamak ya parat dikh rahi hai?"
-    },
-    "scale": [1, 5],
-    "scale_labels": ["None", "Trace", "Some patches", "Widespread", "Thick layer"],
-    "photo_required": true,
-    "required": true,
-    "higher_is_worse": true
-  },
-  {
-    "id": "water_flow",
+    "id": "flow",
     "label": "Water flow",
     "help": {
-      "en": "Is the water flowing or is it still/stagnant?",
+      "en": "Is the water moving, or is it still and stagnant?",
       "hi": "Paani beh raha hai ya ruka hua hai?"
     },
     "scale": [1, 5],
-    "scale_labels": ["Strong natural flow", "Steady flow", "Slow", "Barely moving", "Stagnant / dry"],
+    "scale_labels": ["Strong natural flow", "Steady flow", "Slow trickle", "Barely moving", "Standing water or dry bed"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Watch a leaf or bubble on the surface: does it drift downstream within a few seconds?",
+      "Is any part of the channel you can see completely dry?"
+    ]
+  },
+  {
+    "id": "water_colour",
+    "label": "Water colour",
+    "help": {
+      "en": "What colour is the water compared with clean stream water?",
+      "hi": "Saaf paani ke muqable is paani ka rang kaisa hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Clear and natural", "Slightly tinted", "Greenish or grey", "Brown and murky", "Black, red or unnatural"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "In knee-deep water, can you see stones on the bottom?",
+      "Is the colour the same upstream and downstream, or does it change at one spot?"
+    ]
+  },
+  {
+    "id": "channel_form",
+    "label": "Channel shape and banks",
+    "help": {
+      "en": "Does the stream still wind naturally, or has it been straightened and lined?",
+      "hi": "Nadi apne natural mod ke saath behti hai, ya seedhi karke pakki kar di gayi hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Natural winding channel", "Mostly natural", "Partly reshaped", "Straightened with hard banks", "Fully concrete or covered"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Are the banks soil and stone, or concrete, brick and cement?",
+      "Does the channel bend along its length, or run in a straight line?"
+    ]
+  },
+  {
+    "id": "riparian_vegetation",
+    "label": "Bankside vegetation",
+    "help": {
+      "en": "How much natural plant cover grows along the banks?",
+      "hi": "Kinaron pe kitne natural paudhe aur ped hain?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Dense trees and shrubs", "Mostly vegetated", "Patchy cover", "Sparse, mostly bare", "No vegetation at all"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Do trees or shrubs shade any part of the water?",
+      "Is there plant cover on both banks, or only on one side?"
+    ]
+  },
+  {
+    "id": "discharge_points",
+    "label": "Pipes and discharge points",
+    "help": {
+      "en": "Can you see pipes, drains or outlets emptying into the stream?",
+      "hi": "Koi pipe, naali ya drain nadi mein gir rahi hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["None visible", "One dry or clean outlet", "One outlet discharging", "Several outlets discharging", "Continuous heavy discharge"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Is anything actually flowing out of the pipe right now, or is it dry?",
+      "Does the water change colour, foam or smell just below the outlet?"
+    ]
+  },
+  {
+    "id": "litter_debris",
+    "label": "Litter and debris",
+    "help": {
+      "en": "How much plastic, waste or dumped material can you see in or beside the water?",
+      "hi": "Paani mein ya kinare pe kitna plastic, kachra ya malba dikh raha hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["None", "A few items", "Scattered waste", "Heavy accumulation", "Surface covered in waste"],
+    "photo_required": true,
+    "required": true,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Is it mostly plastic and packaging, or natural leaves and branches?",
+      "Is the waste floating in the water, or only lying on the bank?"
+    ]
+  },
+  {
+    "id": "invasive_species",
+    "label": "Invasive plants",
+    "help": {
+      "en": "Do aggressive spreading plants such as water hyacinth or lantana cover the water or banks?",
+      "hi": "Jalkumbhi ya lantana jaise tezi se failne wale paudhe paani ya kinare pe chhaye hain?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["None seen", "A few isolated plants", "Scattered patches", "Large patches", "Choking the channel"],
     "photo_required": true,
     "required": false,
-    "higher_is_worse": true
+    "higher_is_worse": true,
+    "cross_exam": [
+      "Do you see floating mats of water hyacinth sitting on the surface?",
+      "Is one single plant type crowding out everything else?"
+    ]
+  },
+  {
+    "id": "impervious_surfaces",
+    "label": "Hard surfaces around the stream",
+    "help": {
+      "en": "How much of the ground around the stream is paved, built over or sealed?",
+      "hi": "Nadi ke aas-paas kitni zameen pakki, sadak ya building se dhaki hai?"
+    },
+    "scale": [1, 5],
+    "scale_labels": ["Natural ground all around", "Mostly soil and greenery", "Mixed paved and open ground", "Mostly paved or built up", "Completely sealed surfaces"],
+    "photo_required": true,
+    "required": false,
+    "higher_is_worse": true,
+    "cross_exam": [
+      "If it rained now, would water soak into the ground, or run straight into the stream?",
+      "Is there a road, parking area or building right at the bank?"
+    ]
   }
 ]

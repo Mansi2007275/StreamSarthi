@@ -6,6 +6,9 @@ export type Indicator = {
   scale_labels: string[];
   photo_required: boolean;
   required: boolean;
+  higher_is_worse?: boolean;
+  /** Discriminating questions from config, shown when the citizen and the AI disagree. */
+  cross_exam?: string[];
 };
 
 export type ObservationStatus =

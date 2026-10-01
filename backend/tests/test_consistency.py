@@ -24,7 +24,7 @@ def test_gps_present_not_flagged():
 
 
 def test_strong_disagreement_detected():
-    ans = _answer("water_appearance", human=1, ai=4, conf=0.9)
+    ans = _answer("water_colour", human=1, ai=4, conf=0.9)
     assert is_strong_disagreement(ans) is True
 
     issues = check_observation({"lat": 1, "lng": 1}, [ans])
@@ -32,7 +32,7 @@ def test_strong_disagreement_detected():
 
 
 def test_low_confidence_disagreement_not_flagged():
-    ans = _answer("water_appearance", human=1, ai=4, conf=0.5)
+    ans = _answer("water_colour", human=1, ai=4, conf=0.5)
     assert is_strong_disagreement(ans) is False
 
     issues = check_observation({"lat": 1, "lng": 1}, [ans])
@@ -41,15 +41,15 @@ def test_low_confidence_disagreement_not_flagged():
 
 def test_contradiction_rule_triggers():
     answers = [
-        _answer("water_appearance", human=1, ai=1, conf=0.9),
-        _answer("foam_or_film", human=5, ai=5, conf=0.9),
+        _answer("water_colour", human=1, ai=1, conf=0.9),
+        _answer("discharge_points", human=5, ai=5, conf=0.9),
     ]
     issues = check_observation({"lat": 1, "lng": 1}, answers)
-    assert any(i["code"] == "contradiction:clear_water_but_thick_film" for i in issues)
+    assert any(i["code"] == "contradiction:clear_water_but_heavy_discharge" for i in issues)
 
 
 def test_rule_with_missing_indicator_does_not_trigger():
-    answers = [_answer("water_appearance", human=1, ai=1, conf=0.9)]
+    answers = [_answer("water_colour", human=1, ai=1, conf=0.9)]
     issues = check_observation({"lat": 1, "lng": 1}, answers)
     assert not any(i["code"].startswith("contradiction:") for i in issues)
 
