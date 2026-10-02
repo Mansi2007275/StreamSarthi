@@ -18,6 +18,7 @@ from app.core.errors import not_found
 from app.models.schemas import (
     BadgeOut,
     BlindSpotOut,
+    DueSiteOut,
     HomeOut,
     LessonOut,
     LevelOut,
@@ -30,8 +31,8 @@ from app.models.schemas import (
     WeeklyAccuracyOut,
 )
 from app.routers.lessons import _lesson_out
+from app.services import adoption, blind_spots, points, progress, quests
 from app.services import badges as badges_svc
-from app.services import blind_spots, points, progress, quests
 from app.services.db import RepoProtocol, get_repo
 from app.services.game import skill_map
 from app.services.game_config import load_game_config
@@ -86,8 +87,49 @@ def _gather(repo: RepoProtocol, user_id: str) -> tuple[dict, list[dict], dict]:
         [a for a in judged_answers if a], votes_by_answer, user_id, cfg["agree_max_diff"]
     )
 
-    stats = progress.player_stats(gold_votes, observations, answers_by_obs, profile, caught_errors=caught)
+    streak = adoption.streak_for_badge(_my_check_dates_by_site(repo, user_id))
+    stats = progress.player_stats(
+        gold_votes, observations, answers_by_obs, profile, caught_errors=caught, adopted_streak=streak
+    )
     return stats, gold_votes, profile
+
+
+def _my_check_dates_by_site(repo: RepoProtocol, user_id: str) -> dict[str, list]:
+    """This user's own check dates per adopted site, which is what a streak counts."""
+    dates: dict[str, list] = {}
+    for row in repo.list_adoptions(user_id):
+        site_id = row["site_id"]
+        dates[site_id] = [
+            o["submitted_at"]
+            for o in repo.list_site_observations(site_id, user_id=user_id)
+            if o.get("submitted_at")
+        ]
+    return dates
+
+
+def _due_site(repo: RepoProtocol, user_id: str, cfg: dict) -> DueSiteOut | None:
+    """Home card (d): the adopted site most in need of a visit, or nothing to say."""
+    today = adoption.today_utc()
+    worst = None
+    for row in repo.list_adoptions(user_id):
+        mine = [
+            o["submitted_at"]
+            for o in repo.list_site_observations(row["site_id"], user_id=user_id)
+            if o.get("submitted_at")
+        ]
+        status = adoption.due_status(max(mine) if mine else None, today, cfg)
+        if status == adoption.OK:
+            continue
+        candidate = DueSiteOut(
+            site_id=row["site_id"],
+            name=(row.get("site") or {}).get("name"),
+            due_status=status,
+            streak_months=adoption.streak_months(mine, today),
+        )
+        # Overdue beats due-soon, so the card always names the one that matters most.
+        if worst is None or (status == adoption.DUE and worst.due_status != adoption.DUE):
+            worst = candidate
+    return worst
 
 
 def _quest_counts(repo: RepoProtocol, user_id: str, now: datetime | None = None) -> dict[str, int]:
@@ -146,6 +188,7 @@ def home(
         unseen_receipts=repo.count_receipts(user.id, unseen_only=True),
         lesson=_lesson_out(lesson) if lesson else None,
         quest=quest,
+        due_site=_due_site(repo, user.id, cfg),
     )
 
 

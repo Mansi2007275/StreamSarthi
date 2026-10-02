@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import AISecondOpinion from "@/components/AISecondOpinion";
@@ -13,7 +14,7 @@ import StepCard from "@/components/StepCard";
 import SubmitSuccess from "@/components/SubmitSuccess";
 import { useToast } from "@/components/Toast";
 import { api, friendlyMessage } from "@/lib/api";
-import type { Confidence, Indicator, IndicatorResult, NearestSite, SubmitResult } from "@/lib/types";
+import type { Confidence, Indicator, IndicatorResult, MyStream, NearestSite, SubmitResult } from "@/lib/types";
 
 type Draft = {
   photo: Blob | null;
@@ -39,6 +40,8 @@ function getPosition(): Promise<{ lat: number; lng: number } | null> {
 
 function Assess() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const presetSite = searchParams.get("site");
   const [indicators, setIndicators] = useState<Indicator[] | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -47,6 +50,8 @@ function Assess() {
   const [nearest, setNearest] = useState<NearestSite | null>(null);
   const [atSiteStep, setAtSiteStep] = useState(false);
   const [siteName, setSiteName] = useState<string | null>(null);
+  const [siteId, setSiteId] = useState<string | null>(null);
+  const [adopted, setAdopted] = useState<MyStream | null>(null);
   const [idx, setIdx] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState(false);
@@ -68,10 +73,30 @@ function Assess() {
         await createObservation(null, null, null, null);
         return;
       }
+      // "Check now" from My Stream already names the site: skip straight past the step.
+      if (presetSite) {
+        await createObservation(pos.lat, pos.lng, presetSite, null);
+        return;
+      }
+      let match: NearestSite | null = null;
       try {
-        setNearest(await api.sitesNear(pos.lat, pos.lng));
+        match = await api.sitesNear(pos.lat, pos.lng);
+        setNearest(match);
       } catch {
         setNearest(null); // a failed lookup just means "new place", never a blocked check
+      }
+      let mine: MyStream | null = null;
+      try {
+        mine = await api.myStream();
+        setAdopted(mine);
+      } catch {
+        setAdopted(null);
+      }
+      // Standing at a stream you already look after: adopt-and-confirm in one tap.
+      const isAdopted = match?.site && mine?.sites.some((x) => x.site_id === match!.site!.id);
+      if (isAdopted && match?.site) {
+        await createObservation(pos.lat, pos.lng, match.site.id, null);
+        return;
       }
       setAtSiteStep(true);
     } catch (e) {
@@ -92,6 +117,7 @@ function Assess() {
       const obs = await api.createObservation(lat, lng, { siteId, siteName: name });
       setObsId(obs.id);
       setSiteName(obs.site_name);
+      setSiteId(obs.site_id);
       setAtSiteStep(false);
     } catch (e) {
       toast("error", friendlyMessage(e));
@@ -100,7 +126,17 @@ function Assess() {
     }
   }
 
-  if (submitted) return <SubmitSuccess result={submitted} />;
+  if (submitted) {
+    const alreadyAdopted = !!siteId && !!adopted?.sites.some((s) => s.site_id === siteId);
+    return (
+      <SubmitSuccess
+        result={submitted}
+        siteId={siteId}
+        siteName={siteName}
+        canAdopt={!alreadyAdopted && (adopted?.can_adopt_more ?? true)}
+      />
+    );
+  }
 
   if (!indicators) {
     return (

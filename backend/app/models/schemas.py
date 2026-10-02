@@ -520,6 +520,8 @@ class HomeOut(BaseModel):
     unseen_receipts: int = 0
     lesson: LessonOut | None = None
     quest: QuestOut | None = None
+    # Card (d): only set when an adopted site actually wants a visit. Crews stay out until Phase 7.
+    due_site: "DueSiteOut | None" = None
 
 
 class SkillRowOut(BaseModel):
@@ -570,3 +572,66 @@ class ProfileOut(BaseModel):
     skill_map: list[SkillRowOut]
     blind_spots: list[BlindSpotOut]
     badges: list[BadgeOut]
+
+
+# ---------- Phase 6: Adopt-a-Stream ----------
+class AdoptedSiteOut(BaseModel):
+    """Coordinates are rounded to ~100 m: enough to find the stream, not enough to point at
+    the person who checked it."""
+
+    site_id: str
+    name: str | None
+    lat: float | None
+    lng: float | None
+    adopted_at: str | None
+    last_check: str | None
+    next_check_due: str | None
+    due_status: Literal["ok", "due_soon", "due"]
+    streak_months: int
+    checks: int
+    one_health_level: str | None
+    others_this_month: int
+
+
+class MyStreamOut(BaseModel):
+    sites: list[AdoptedSiteOut]
+    max_sites: int
+    can_adopt_more: bool
+
+
+class TimelineEntryOut(BaseModel):
+    """One month at a site, aggregated across everybody who checked it."""
+
+    month: str
+    date: str | None
+    one_health_level: str | None
+    worst_indicators: list[str] = []
+    verified: bool
+    checks: int
+    mine: int
+
+
+class SiteTimelineOut(BaseModel):
+    site_id: str
+    name: str | None
+    lat: float | None
+    lng: float | None
+    adopted: bool
+    streak_months: int
+    due_status: Literal["ok", "due_soon", "due"]
+    entries: list[TimelineEntryOut]
+
+
+class AdoptionOut(BaseModel):
+    site_id: str
+    name: str | None
+    adopted: bool
+    adopted_count: int
+    max_sites: int
+
+
+class DueSiteOut(BaseModel):
+    site_id: str
+    name: str | None
+    due_status: Literal["due_soon", "due"]
+    streak_months: int

@@ -30,8 +30,8 @@ from app.models.schemas import (
     VoteAckOut,
     VoteIn,
 )
+from app.services import adopted_bonus, blind_spots, points
 from app.services import badges as badges_svc
-from app.services import blind_spots, points
 from app.services.consensus import (
     AGREES,
     ROUTE_TO_EXPERT_STATUSES,
@@ -405,6 +405,8 @@ def _crowd_verify(repo: RepoProtocol, obs: dict, answers: list[dict], cfg: dict)
         ),
         observation_id=obs["id"],
     )
+    # An adopted site earns its monthly bonus the moment a check there is verified.
+    _best_effort("adopted_bonus", lambda: adopted_bonus.award_if_due(repo, obs, cfg), observation_id=obs["id"])
     log_event("crowd_verified", observation_id=obs["id"], settled_rows=settled, points=total)
 
 

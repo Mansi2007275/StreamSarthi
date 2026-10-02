@@ -127,7 +127,28 @@ function Dashboard() {
             </section>
           )}
 
-          {receipts.length === 0 && !data.lesson && !data.quest && (
+          {data.due_site && (
+            <Link
+              href={`/assess?site=${data.due_site.site_id}`}
+              className={`block rounded-2xl border p-4 ${
+                data.due_site.due_status === "due"
+                  ? "border-red-200 bg-red-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              <p className={`text-sm font-semibold ${data.due_site.due_status === "due" ? "text-red-800" : "text-amber-900"}`}>
+                {data.due_site.name ?? "Your adopted stream"} is due for a check
+              </p>
+              <p className="mt-1 text-sm text-ink">
+                {data.due_site.streak_months > 0
+                  ? `Keep your ${data.due_site.streak_months}-month streak going.`
+                  : "One check a month is all it takes."}
+              </p>
+              <p className="mt-2 text-sm font-medium text-brand-700">Check it now →</p>
+            </Link>
+          )}
+
+          {receipts.length === 0 && !data.lesson && !data.quest && !data.due_site && (
             <section className="rounded-2xl bg-white p-5 text-center shadow-sm">
               <p className="font-semibold">All caught up</p>
               <p className="mt-1 text-sm text-muted">

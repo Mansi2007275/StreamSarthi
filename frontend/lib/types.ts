@@ -454,6 +454,7 @@ export type Home = {
   unseen_receipts: number;
   lesson: Lesson | null;
   quest: Quest | null;
+  due_site: DueSite | null;
 };
 
 export type SkillRow = {
@@ -499,4 +500,64 @@ export type Profile = {
   skill_map: SkillRow[];
   blind_spots: BlindSpot[];
   badges: Badge[];
+};
+
+// ---------- Phase 6: Adopt-a-Stream ----------
+export type DueStatus = "ok" | "due_soon" | "due";
+
+export type AdoptedSite = {
+  site_id: string;
+  name: string | null;
+  lat: number | null;
+  lng: number | null;
+  adopted_at: string | null;
+  last_check: string | null;
+  next_check_due: string | null;
+  due_status: DueStatus;
+  streak_months: number;
+  checks: number;
+  one_health_level: string | null;
+  others_this_month: number;
+};
+
+export type MyStream = {
+  sites: AdoptedSite[];
+  max_sites: number;
+  can_adopt_more: boolean;
+};
+
+export type TimelineEntry = {
+  month: string;
+  date: string | null;
+  one_health_level: string | null;
+  worst_indicators: string[];
+  verified: boolean;
+  checks: number;
+  mine: number;
+};
+
+export type SiteTimeline = {
+  site_id: string;
+  name: string | null;
+  lat: number | null;
+  lng: number | null;
+  adopted: boolean;
+  streak_months: number;
+  due_status: DueStatus;
+  entries: TimelineEntry[];
+};
+
+export type Adoption = {
+  site_id: string;
+  name: string | null;
+  adopted: boolean;
+  adopted_count: number;
+  max_sites: number;
+};
+
+export type DueSite = {
+  site_id: string;
+  name: string | null;
+  due_status: "due_soon" | "due";
+  streak_months: number;
 };

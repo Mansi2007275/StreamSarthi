@@ -77,6 +77,12 @@ class RepoProtocol(Protocol):
     def get_site(self, site_id: str) -> dict | None: ...
     def list_sites(self) -> list[dict]: ...
     def crew_id_for_user(self, user_id: str) -> str | None: ...
+    # ----- Phase 6: Adopt-a-Stream -----
+    def list_adoptions(self, user_id: str) -> list[dict]: ...
+    def get_adoption(self, user_id: str, site_id: str) -> dict | None: ...
+    def insert_adoption(self, user_id: str, site_id: str) -> dict: ...
+    def release_adoption(self, adoption_id: str) -> dict: ...
+    def list_site_observations(self, site_id: str, user_id: str | None = None) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -474,6 +480,65 @@ class SupabaseRepo:
         """Crews land in Phase 7. Until then nobody has one, so the crew anti-cheat rule
         is live and tested but has nothing to exclude on."""
         return None
+
+    # ---------------- Phase 6: Adopt-a-Stream ----------------
+
+    def list_adoptions(self, user_id):
+        """Active adoptions only, with the site joined in."""
+        res = (
+            self.db.table("site_adoptions")
+            .select("id, site_id, adopted_at, sites!inner(id, name, lat, lng)")
+            .eq("user_id", user_id)
+            .is_("released_at", "null")
+            .order("adopted_at")
+            .execute()
+        )
+        rows = []
+        for r in res.data or []:
+            site = r.pop("sites") or {}
+            rows.append({**r, "site": site})
+        return rows
+
+    def get_adoption(self, user_id, site_id):
+        res = (
+            self.db.table("site_adoptions")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("site_id", site_id)
+            .is_("released_at", "null")
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def insert_adoption(self, user_id, site_id):
+        res = self.db.table("site_adoptions").insert({"user_id": user_id, "site_id": site_id}).execute()
+        return res.data[0]
+
+    def release_adoption(self, adoption_id):
+        res = (
+            self.db.table("site_adoptions")
+            .update({"released_at": now_iso()})
+            .eq("id", adoption_id)
+            .execute()
+        )
+        return res.data[0]
+
+    def list_site_observations(self, site_id, user_id=None):
+        """Submitted observations at a site. `user_id` narrows it to that person's own.
+
+        Selects no identifying columns beyond user_id itself, which callers use to filter
+        and never put in a response.
+        """
+        q = (
+            self.db.table("observations")
+            .select("id, user_id, status, crowd_verified, submitted_at, one_health, reviewed_at")
+            .eq("site_id", site_id)
+            .neq("status", "draft")
+        )
+        if user_id:
+            q = q.eq("user_id", user_id)
+        return q.order("submitted_at", desc=True).execute().data or []
 
 
 @lru_cache

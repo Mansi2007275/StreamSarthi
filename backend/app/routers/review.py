@@ -23,7 +23,7 @@ from app.models.schemas import (
     ReviewStatsOut,
 )
 from app.routers.observations import _observation_out
-from app.services import audit, points, settle
+from app.services import adopted_bonus, audit, points, settle
 from app.services import badges as badges_svc
 from app.services.db import RepoProtocol, get_repo, now_iso
 from app.services.game_config import load_game_config
@@ -268,6 +268,9 @@ def _settle_everyone(
         lambda: repo.insert_receipt(settle.receipt_for(action, awarded_total, obs_id, citizen_id)),
         observation_id=obs_id,
     )
+    if action != settle.REJECT:
+        # Same bonus, same rules as the crowd path: a rejected report earns nothing.
+        _best_effort("adopted_bonus", lambda: adopted_bonus.award_if_due(repo, obs, cfg), observation_id=obs_id)
 
     # ---- the voters ----
     votes_by_answer = {

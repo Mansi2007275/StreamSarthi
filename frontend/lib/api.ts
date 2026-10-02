@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type {
+  Adoption,
   AuditResponse,
   Home as HomeData,
   Profile,
@@ -15,8 +16,9 @@ import type {
   IndicatorResult,
   Lesson,
   LessonsPage,
-  MapResponse,
   MadeGold,
+  MapResponse,
+  MyStream,
   Me,
   NearestSite,
   Observation,
@@ -29,6 +31,7 @@ import type {
   ReviewDetail,
   ReviewQueuePage,
   ReviewStats,
+  SiteTimeline,
   SubmitResult,
   VoteResult,
 } from "./types";
@@ -103,6 +106,10 @@ export const api = {
       json: { lat, lng, site_id: site.siteId ?? null, site_name: site.siteName ?? null },
     }),
   sitesNear: (lat: number, lng: number) => request<NearestSite>(`/api/v1/sites/near?lat=${lat}&lng=${lng}`),
+  myStream: () => request<MyStream>("/api/v1/my-stream"),
+  adoptSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/adopt`, { method: "POST" }),
+  releaseSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/release`, { method: "POST" }),
+  siteTimeline: (siteId: string) => request<SiteTimeline>(`/api/v1/sites/${siteId}/timeline`),
   answerIndicator: (
     obsId: string,
     indicatorId: string,
