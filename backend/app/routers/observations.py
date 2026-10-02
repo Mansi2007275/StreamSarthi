@@ -21,7 +21,7 @@ from app.models.schemas import (
     ObservationPage,
     ObservationSummary,
 )
-from app.services import ai_opinion, audit
+from app.services import ai_opinion, audit, points
 from app.services import photo_quality as pq
 from app.services.consistency import check_observation, is_strong_disagreement
 from app.services.db import RepoProtocol, get_repo, now_iso
@@ -301,6 +301,16 @@ def submit(
             existing = list(a.get("flags") or [])
             if "strong_disagreement" not in existing:
                 repo.update_answer(obs_id, a["indicator_id"], {"flags": existing + ["strong_disagreement"]})
+
+    # Points for a stream check start PENDING: being right is what pays, not posting. They
+    # settle when the crowd verifies (routers/play.py) or an expert reviews (Phase 4).
+    # Best-effort: a failed ledger write must never cost the citizen their submission.
+    try:
+        rows = points.pending_rows_for_submit(user.id, answers)
+        existing = {points.dedupe_key(p) for p in repo.list_points(user.id)}
+        repo.insert_points(points.filter_new(rows, existing))
+    except Exception:
+        logger.exception("pending_points_failed", extra={"extra_fields": {"observation_id": obs_id}})
 
     _audit_best_effort(repo, obs_id, user.id, "submitted", {"trust_score": trust["score"]})
     if issues:

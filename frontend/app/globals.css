@@ -40,3 +40,40 @@ body {
 @keyframes slideout {
   to { opacity: 0; transform: translateX(24px) scale(0.98); }
 }
+
+/* ---------- Guardians: celebration on a gold match ----------
+   CSS only, no new dependency. Confetti pieces are plain divs the page positions. */
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.8); }
+  60%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes confetti-fall {
+  from { opacity: 1; transform: translateY(-8px) rotate(0deg); }
+  to   { opacity: 0; transform: translateY(120px) rotate(320deg); }
+}
+.pop-in { animation: pop-in 0.32s ease-out both; }
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti-fall 1.1s ease-in forwards;
+}
+
+/* ---------- Respect the OS "reduce motion" setting ----------
+   Everything still appears, it just stops moving. Confetti is removed entirely
+   rather than frozen mid-air. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton { animation: none; background: #e7efed; }
+  .confetti-piece { display: none; }
+}

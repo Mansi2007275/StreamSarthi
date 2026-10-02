@@ -125,6 +125,7 @@ class MeOut(BaseModel):
     role: str
     observer_accuracy: float | None
     calibrated_at: str | None = None
+    onboarded_at: str | None = None  # null -> the frontend sends them to /welcome
 
 
 # ---------- v3: expert review ----------
@@ -257,3 +258,101 @@ class DisagreementOut(BaseModel):
     ai_wrong_rate: float | None
     matrix: list[list[int]]
     scale: list[int]
+
+
+# ---------- Guardians: Spot Check game ----------
+class PlayIndicatorOut(BaseModel):
+    """Only what is needed to answer the question. No cross_exam, no higher_is_worse."""
+
+    id: str
+    label: str
+    help: dict[str, str]
+    scale: tuple[int, int]
+    scale_labels: list[str]
+
+
+class PlayItemOut(BaseModel):
+    """One photo to judge.
+
+    Gold and real answers are returned in exactly this shape. Anything that could reveal
+    the submitter, the place, or what anybody else said is absent by construction - there
+    is no field here to put it in.
+    """
+
+    item_type: Literal["gold", "answer"]
+    id: str
+    indicator: PlayIndicatorOut
+    image_url: str | None
+
+
+class PlayRoundOut(BaseModel):
+    items: list[PlayItemOut]
+    round_size: int
+
+
+class VoteIn(BaseModel):
+    item_type: Literal["gold", "answer"]
+    id: str
+    score: int
+    confidence: Literal["sure", "somewhat", "guess"] | None = None
+
+
+class GoldRevealOut(BaseModel):
+    """Instant feedback, and only ever for gold: a real answer has no known truth yet."""
+
+    status: Literal["revealed"] = "revealed"
+    expert_score: int
+    expert_label: str | None
+    explanation: str
+    matched: bool
+    close: bool  # within 1 point - shown as "close", never as "wrong"
+    points_awarded: int
+
+
+class VoteAckOut(BaseModel):
+    status: Literal["thanks"] = "thanks"
+    votes_needed: int
+    message: str
+
+
+class OnboardingCompleteOut(BaseModel):
+    matched: int
+    total: int
+    accuracy: float | None
+    strongest_indicator: str | None
+    strongest_label: str | None
+    focus_indicator: str | None
+    focus_label: str | None
+    message: str | None
+    badges: list[str] = []
+    onboarded_at: str
+
+
+# ---------- Guardians: data-quality proof ----------
+class ProofAgreementOut(BaseModel):
+    n: int
+    exact: float | None
+    within_1: float | None
+    mean_abs_error: float | None
+
+
+class ProofIndicatorOut(BaseModel):
+    indicator_id: str
+    label: str
+    single_citizen_vs_expert: ProofAgreementOut
+    crowd_verified_vs_expert: ProofAgreementOut
+
+
+class ProofCountsOut(BaseModel):
+    total_submitted: int
+    needed_expert: int
+    crowd_verified: int
+    expert_scored_answers: int
+
+
+class ProofOut(BaseModel):
+    single_citizen_vs_expert: ProofAgreementOut
+    crowd_verified_vs_expert: ProofAgreementOut
+    per_indicator: list[ProofIndicatorOut]
+    share_needed_expert: float | None
+    counts: ProofCountsOut

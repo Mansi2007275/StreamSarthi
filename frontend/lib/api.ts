@@ -5,6 +5,7 @@ import type {
   CalibrationAnswerResult,
   CalibrationCompleteResult,
   CalibrationItem,
+  Confidence,
   Disagreement,
   Indicator,
   IndicatorResult,
@@ -14,9 +15,13 @@ import type {
   Me,
   Observation,
   ObservationPage,
+  OnboardingResult,
+  PlayRound,
+  Proof,
   ReviewActionBody,
   ReviewDetail,
   ReviewQueuePage,
+  VoteResult,
 } from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -121,4 +126,15 @@ export const api = {
   calibrationComplete: (answers: Record<string, number>) =>
     request<CalibrationCompleteResult>("/api/v1/calibration/complete", { method: "POST", json: { answers } }),
   disagreement: () => request<Disagreement[]>("/api/v1/insights/disagreement"),
+  proof: () => request<Proof>("/api/v1/insights/proof"),
+
+  // ---------- Guardians: Spot Check ----------
+  playOnboarding: () => request<PlayRound>("/api/v1/play/onboarding"),
+  playRound: () => request<PlayRound>("/api/v1/play/round"),
+  playVote: (itemType: "gold" | "answer", id: string, score: number, confidence: Confidence | null) =>
+    request<VoteResult>("/api/v1/play/vote", {
+      method: "POST",
+      json: { item_type: itemType, id, score, confidence },
+    }),
+  playOnboardingComplete: () => request<OnboardingResult>("/api/v1/play/onboarding/complete", { method: "POST" }),
 };

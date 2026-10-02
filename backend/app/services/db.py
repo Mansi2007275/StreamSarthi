@@ -54,6 +54,7 @@ class RepoProtocol(Protocol):
     def get_vote(self, voter_id: str, answer_id: str | None, gold_item_id: str | None) -> dict | None: ...
     def update_vote(self, vote_id: str, fields: dict[str, Any]) -> dict: ...
     def list_votes_for_answer(self, answer_id: str) -> list[dict]: ...
+    def list_votes_by_voter(self, voter_id: str) -> list[dict]: ...
     def list_gold_votes(self, voter_id: str) -> list[dict]: ...
     def count_votes(self, voter_id: str, is_gold: bool | None = None) -> int: ...
     def list_vote_candidates(self, exclude_user_id: str, limit: int = 50) -> list[dict]: ...
@@ -295,6 +296,16 @@ class SupabaseRepo:
 
     def list_votes_for_answer(self, answer_id):
         res = self.db.table("validation_votes").select("*").eq("answer_id", answer_id).execute()
+        return res.data or []
+
+    def list_votes_by_voter(self, voter_id):
+        """Everything this player has already judged, so a round never offers it twice."""
+        res = (
+            self.db.table("validation_votes")
+            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct")
+            .eq("voter_id", voter_id)
+            .execute()
+        )
         return res.data or []
 
     def list_gold_votes(self, voter_id):

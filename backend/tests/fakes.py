@@ -45,6 +45,10 @@ class FakeRepo:
             "created_at": now_iso(),
             "submitted_at": None,
             "trust_score": None,
+            # migration 005 defaults, so the fake matches the real table
+            "crowd_verified": False,
+            "crew_id": None,
+            "site_id": None,
         }
         self.observations[oid] = obs
         return dict(obs)
@@ -238,6 +242,9 @@ class FakeRepo:
 
     def list_votes_for_answer(self, answer_id):
         return [dict(v) for v in self.votes.values() if v.get("answer_id") == answer_id]
+
+    def list_votes_by_voter(self, voter_id):
+        return [dict(v) for v in self.votes.values() if v["voter_id"] == voter_id]
 
     def list_gold_votes(self, voter_id):
         out = []
