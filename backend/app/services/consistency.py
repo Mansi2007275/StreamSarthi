@@ -8,6 +8,7 @@ import operator
 from functools import lru_cache
 from pathlib import Path
 
+from app.services.game_config import load_game_config
 from app.services.indicators import get_indicator, load_indicators
 from app.services.scoring import final_score
 
@@ -15,6 +16,8 @@ RULES_FILE = Path(__file__).resolve().parent.parent / "config" / "rules.json"
 
 STRONG_DIFF = 2
 STRONG_CONF = 0.7
+
+GUESS = "guess"
 
 _OPS = {
     "<=": operator.le,
@@ -37,17 +40,46 @@ def load_rules() -> list[dict]:
 
 
 def is_strong_disagreement(answer: dict) -> bool:
+    """Routing rule: a confident AI disagreeing is worth an expert's time."""
     human, ai, conf = answer.get("human_score"), answer.get("ai_score"), answer.get("ai_confidence")
     if human is None or ai is None or conf is None:
         return False
     return abs(human - ai) >= STRONG_DIFF and conf > STRONG_CONF
 
 
-def check_observation(obs: dict, answers: list[dict]) -> list[dict]:
+def is_disagreement(answer: dict, cfg: dict | None = None) -> bool:
+    """UI rule: should the citizen see the Disagreement Card instead of the plain AI card?
+
+    Deliberately looser than `is_strong_disagreement` - it ignores AI confidence, because a
+    hesitant AI that reads the photo two points differently is still worth a second look.
+    The two rules answer different questions, so they stay separate.
+    """
+    cfg = cfg or load_game_config()
+    human, ai = answer.get("human_score"), answer.get("ai_score")
+    if human is None or ai is None or not answer.get("ai_can_assess", True):
+        return False
+    return abs(human - ai) >= cfg["stream_check"]["disagreement_card_min_diff"]
+
+
+def check_observation(obs: dict, answers: list[dict], cfg: dict | None = None) -> list[dict]:
+    cfg = cfg or load_game_config()
     issues: list[dict] = []
 
     if obs.get("lat") is None or obs.get("lng") is None:
         issues.append({"code": "gps_missing", "message": "Location was not recorded"})
+
+    # The citizen told us they were guessing. Taking them at their word is the whole point
+    # of asking: an answer the observer does not trust should not be trusted downstream.
+    unsure = [a["indicator_id"] for a in answers if a.get("human_confidence") == GUESS]
+    if len(unsure) >= cfg["stream_check"]["unsure_answers_to_review"]:
+        labels = [(get_indicator(i).label if get_indicator(i) else i) for i in unsure]
+        issues.append(
+            {
+                "code": "citizen_unsure",
+                "message": "The citizen was unsure about: " + ", ".join(labels),
+                "indicators": unsure,
+            }
+        )
 
     for a in answers:
         if is_strong_disagreement(a):

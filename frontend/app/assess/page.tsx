@@ -1,26 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
-import StepCard from "@/components/StepCard";
-import PhotoCapture from "@/components/PhotoCapture";
-import ScalePicker from "@/components/ScalePicker";
 import AISecondOpinion from "@/components/AISecondOpinion";
+import ConfidencePicker from "@/components/ConfidencePicker";
+import DisagreementCard from "@/components/DisagreementCard";
+import PhotoCapture from "@/components/PhotoCapture";
 import PhotoQualityWarning from "@/components/PhotoQualityWarning";
+import ScalePicker from "@/components/ScalePicker";
+import SiteStep from "@/components/SiteStep";
+import StepCard from "@/components/StepCard";
+import SubmitSuccess from "@/components/SubmitSuccess";
 import { useToast } from "@/components/Toast";
 import { api, friendlyMessage } from "@/lib/api";
-import type { Indicator, IndicatorResult } from "@/lib/types";
+import type { Confidence, Indicator, IndicatorResult, NearestSite, SubmitResult } from "@/lib/types";
 
 type Draft = {
   photo: Blob | null;
   preview: string | null;
   human: number | null;
+  confidence: Confidence | null;
   result: IndicatorResult | null;
   choice: "ai" | "mine" | null;
 };
 
-const emptyDraft: Draft = { photo: null, preview: null, human: null, result: null, choice: null };
+const emptyDraft: Draft = { photo: null, preview: null, human: null, confidence: null, result: null, choice: null };
 
 function getPosition(): Promise<{ lat: number; lng: number } | null> {
   return new Promise((resolve) => {
@@ -34,33 +38,69 @@ function getPosition(): Promise<{ lat: number; lng: number } | null> {
 }
 
 function Assess() {
-  const router = useRouter();
   const toast = useToast();
   const [indicators, setIndicators] = useState<Indicator[] | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsMissing, setGpsMissing] = useState(false);
+  const [nearest, setNearest] = useState<NearestSite | null>(null);
+  const [atSiteStep, setAtSiteStep] = useState(false);
+  const [siteName, setSiteName] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState<SubmitResult | null>(null);
 
   useEffect(() => {
     api.indicators().then(setIndicators).catch((e) => toast("error", friendlyMessage(e)));
   }, [toast]);
 
+  /** Step 1: get a fix, then ask whether this is a site we already track. Without a fix
+   *  there is nothing to match on, so the site step is skipped rather than guessed at. */
   async function start() {
     setStarting(true);
     try {
       const pos = await getPosition();
+      setGps(pos);
       setGpsMissing(!pos);
-      const obs = await api.createObservation(pos?.lat ?? null, pos?.lng ?? null);
-      setObsId(obs.id);
+      if (!pos) {
+        await createObservation(null, null, null, null);
+        return;
+      }
+      try {
+        setNearest(await api.sitesNear(pos.lat, pos.lng));
+      } catch {
+        setNearest(null); // a failed lookup just means "new place", never a blocked check
+      }
+      setAtSiteStep(true);
     } catch (e) {
       toast("error", friendlyMessage(e));
     } finally {
       setStarting(false);
     }
   }
+
+  async function createObservation(
+    lat: number | null,
+    lng: number | null,
+    siteId: string | null,
+    name: string | null,
+  ) {
+    setBusy(true);
+    try {
+      const obs = await api.createObservation(lat, lng, { siteId, siteName: name });
+      setObsId(obs.id);
+      setSiteName(obs.site_name);
+      setAtSiteStep(false);
+    } catch (e) {
+      toast("error", friendlyMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (submitted) return <SubmitSuccess result={submitted} />;
 
   if (!indicators) {
     return (
@@ -72,13 +112,24 @@ function Assess() {
     );
   }
 
+  if (atSiteStep) {
+    return (
+      <SiteStep
+        nearest={nearest}
+        busy={busy}
+        onConfirm={(siteId) => createObservation(gps?.lat ?? null, gps?.lng ?? null, siteId, null)}
+        onNewPlace={(name) => createObservation(gps?.lat ?? null, gps?.lng ?? null, null, name)}
+      />
+    );
+  }
+
   if (!obsId) {
     return (
       <div className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold">New stream assessment</h1>
         <p className="text-muted">
-          You will check {indicators.length} things about the stream. For each one: take a photo, pick your score, then see
-          the AI&apos;s second opinion. You decide the final answer.
+          You will check {indicators.length} things about the stream. For each one: take a photo, pick your score, say how
+          sure you are, then see the AI&apos;s second opinion. You decide the final answer.
         </p>
         <ul className="list-inside list-disc text-sm text-muted">
           {indicators.map((i) => (
@@ -91,7 +142,7 @@ function Assess() {
         <p className="text-sm text-muted">We&apos;ll ask for your location so researchers know where the stream is.</p>
         <button
           onClick={start}
-          disabled={starting}
+          disabled={starting || busy}
           className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-60"
         >
           {starting ? "Getting location..." : "Start"}
@@ -105,15 +156,15 @@ function Assess() {
   const isLast = idx === indicators.length - 1;
   const aiHasScore = !!d.result && d.result.can_assess && d.result.ai_score !== null;
   const stepDone = !!d.result && (!aiHasScore || d.choice !== null);
+  const canAskAI = d.human !== null && d.confidence !== null && (!ind.photo_required || !!d.photo);
 
   const update = (patch: Partial<Draft>) => setDrafts((all) => ({ ...all, [ind.id]: { ...d, ...patch } }));
 
   async function askAI() {
-    if (d.human === null) return toast("info", "Pick your own score first.");
-    if (ind.photo_required && !d.photo) return toast("info", "Please add a photo first.");
+    if (!canAskAI) return;
     setBusy(true);
     try {
-      const result = await api.answerIndicator(obsId!, ind.id, d.human, d.photo);
+      const result = await api.answerIndicator(obsId!, ind.id, d.human, d.photo, d.confidence);
       const autoKeep = !(result.can_assess && result.ai_score !== null);
       update({ result, choice: autoKeep ? "mine" : null });
     } catch (e) {
@@ -123,11 +174,11 @@ function Assess() {
     }
   }
 
-  async function choose(choice: "ai" | "mine") {
+  async function choose(choice: "ai" | "mine", confidence?: Confidence) {
     setBusy(true);
     try {
-      await api.chooseAnswer(obsId!, ind.id, choice === "ai", d.human);
-      update({ choice });
+      await api.chooseAnswer(obsId!, ind.id, choice === "ai", d.human, confidence ?? null);
+      update({ choice, confidence: confidence ?? d.confidence });
     } catch (e) {
       toast("error", friendlyMessage(e));
     } finally {
@@ -138,13 +189,7 @@ function Assess() {
   async function submit() {
     setBusy(true);
     try {
-      const result = await api.submit(obsId!);
-      if (result.status === "needs_review") {
-        toast("info", "Submitted. An expert will double-check this one.");
-      } else {
-        toast("success", "Observation submitted. Thank you!");
-      }
-      router.push(`/observations/${obsId}`);
+      setSubmitted(await api.submit(obsId!));
     } catch (e) {
       toast("error", friendlyMessage(e));
       setBusy(false);
@@ -152,6 +197,9 @@ function Assess() {
   }
 
   const next = () => (isLast ? submit() : setIdx(idx + 1));
+  /** Reopen the scale without making them retake the photo. */
+  const reopenScale = () => update({ result: null, choice: null });
+  const retakePhoto = () => update({ photo: null, preview: null, result: null, choice: null });
 
   return (
     <div className="space-y-4">
@@ -160,6 +208,7 @@ function Assess() {
           Location not available. Your observation will be saved without GPS.
         </p>
       )}
+      {siteName && <p className="text-sm text-muted">Site: {siteName}</p>}
 
       <StepCard
         step={idx + 1}
@@ -180,26 +229,78 @@ function Assess() {
             scale={ind.scale}
             labels={ind.scale_labels}
             value={d.human}
-            disabled={busy}
+            disabled={busy || !!d.result}
             onChange={(human) => update({ human, choice: d.result && aiHasScore ? null : d.choice })}
           />
         </div>
 
+        {/* Asked before the AI is called, so the citizen commits to their own answer and
+            their own certainty without being nudged. */}
+        {!d.result && <ConfidencePicker value={d.confidence} onChange={(confidence) => update({ confidence })} disabled={busy} />}
+
         {!d.result && (
           <button
             onClick={askAI}
-            disabled={busy || d.human === null || (ind.photo_required && !d.photo)}
+            disabled={busy || !canAskAI}
             className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-50"
           >
             {busy ? "AI is looking at your photo..." : "Save & get AI second opinion"}
           </button>
         )}
 
+        {!d.result && !canAskAI && (
+          <p className="text-center text-xs text-muted">
+            {d.human === null
+              ? "Pick your score to continue."
+              : d.confidence === null
+                ? "Tell us how sure you are to continue."
+                : "Add a photo to continue."}
+          </p>
+        )}
+
         {busy && !d.result && <div className="skeleton h-40" />}
 
         {d.result && d.result.flags.length > 0 && <PhotoQualityWarning flags={d.result.flags} />}
 
-        {d.result && (
+        {d.result && !d.result.can_assess && (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4" aria-label="AI could not judge this">
+            <p className="font-semibold text-amber-900">I can&apos;t judge this photo</p>
+            <p className="mt-1 text-sm">
+              {d.result.retake_tip || d.result.reason || "Try a clearer, closer photo of the water."}
+            </p>
+            <p className="mt-2 text-sm text-amber-800">Your own answer is saved either way.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={retakePhoto}
+                disabled={busy}
+                className="min-h-12 rounded-xl border border-line bg-white text-sm font-medium disabled:opacity-60"
+              >
+                Retake photo
+              </button>
+              <button
+                onClick={next}
+                disabled={busy}
+                className="min-h-12 rounded-xl bg-brand-600 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {isLast ? "Submit anyway" : "Skip ahead"}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {d.result && d.result.can_assess && d.result.disagreement && (
+          <DisagreementCard
+            result={d.result}
+            indicator={ind}
+            humanScore={d.human}
+            busy={busy}
+            onKeepMine={() => choose("mine")}
+            onChangeAnswer={reopenScale}
+            onAskExpert={() => choose("mine", "guess")}
+          />
+        )}
+
+        {d.result && d.result.can_assess && !d.result.disagreement && (
           <AISecondOpinion
             result={d.result}
             scale={ind.scale}

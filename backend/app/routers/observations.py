@@ -13,6 +13,7 @@ from app.models.schemas import (
     AnswerChoice,
     AnswerOut,
     AuditResponse,
+    Confidence,
     Indicator,
     IndicatorResult,
     ObservationCreate,
@@ -20,11 +21,13 @@ from app.models.schemas import (
     ObservationOut,
     ObservationPage,
     ObservationSummary,
+    SubmitResult,
 )
 from app.services import ai_opinion, audit, points
 from app.services import photo_quality as pq
-from app.services.consistency import check_observation, is_strong_disagreement
+from app.services.consistency import check_observation, is_disagreement, is_strong_disagreement
 from app.services.db import RepoProtocol, get_repo, now_iso
+from app.services.game_config import load_game_config
 from app.services.indicators import get_indicator, load_indicators
 from app.services.one_health import compute_one_health
 from app.services.scoring import final_score
@@ -96,6 +99,10 @@ def _answer_out(ans: dict, storage: StorageProtocol | None = None) -> AnswerOut:
         photo_quality=ans.get("photo_quality"),
         flags=ans.get("flags") or [],
         expert_score=ans.get("expert_score"),
+        human_confidence=ans.get("human_confidence"),
+        crowd_score=ans.get("crowd_score"),
+        crowd_votes=ans.get("crowd_votes") or 0,
+        crowd_status=ans.get("crowd_status"),
     )
 
 
@@ -137,8 +144,23 @@ def create_observation(
 ):
     repo.ensure_profile(user.id, user.email)
     obs = repo.create_observation(user.id, body.lat, body.lng)
+
+    # Resolve the site now, while the client still knows what the citizen chose on the site
+    # step. A confirmed site must exist; a new place is created here so its name is kept.
+    site_id, site_name = None, None
+    if body.site_id:
+        site = repo.get_site(body.site_id)
+        if not site:
+            raise not_found("Site")
+        site_id, site_name = site["id"], site.get("name")
+    elif body.site_name and body.lat is not None and body.lng is not None:
+        site = repo.create_site(body.lat, body.lng, body.site_name.strip() or None)
+        site_id, site_name = site["id"], site.get("name")
+    if site_id:
+        repo.update_observation(obs["id"], {"site_id": site_id})
+
     _audit_best_effort(repo, obs["id"], user.id, "observation_created", {"lat": body.lat, "lng": body.lng})
-    return ObservationCreated(id=obs["id"], status=obs["status"])
+    return ObservationCreated(id=obs["id"], status=obs["status"], site_id=site_id, site_name=site_name)
 
 
 @router.post("/observations/{obs_id}/indicators/{indicator_id}", response_model=IndicatorResult)
@@ -146,6 +168,7 @@ async def answer_indicator(
     obs_id: str,
     indicator_id: str,
     human_score: int | None = Form(default=None),
+    human_confidence: Confidence | None = Form(default=None),
     photo: UploadFile | None = File(default=None),
     user: CurrentUser = Depends(_user),
     repo: RepoProtocol = Depends(get_repo),
@@ -165,6 +188,9 @@ async def answer_indicator(
         "observation_id": obs_id,
         "indicator_id": indicator_id,
         "human_score": human_score,
+        # Asked after the score and before the AI is called, so the citizen commits to both
+        # their answer and how sure they are without the AI having nudged either.
+        "human_confidence": human_confidence,
         "used_ai_answer": False,
     }
     opinion = ai_opinion.FALLBACK.model_copy(update={"reason": "No photo, so no AI opinion"})
@@ -210,6 +236,13 @@ async def answer_indicator(
             {"indicator": indicator_id, "ai_score": opinion.suggested_score, "confidence": opinion.confidence},
         )
 
+    disagreement = is_disagreement(
+        {
+            "human_score": human_score,
+            "ai_score": opinion.suggested_score,
+            "ai_can_assess": opinion.can_assess,
+        }
+    )
     return IndicatorResult(
         indicator_id=indicator_id,
         human_score=human_score,
@@ -221,6 +254,8 @@ async def answer_indicator(
         retake_tip=opinion.retake_tip,
         photo_quality=quality,
         flags=flags,
+        human_confidence=human_confidence,
+        disagreement=disagreement,
     )
 
 
@@ -245,6 +280,9 @@ def choose_answer(
     if body.human_score is not None:
         _check_score(body.human_score, ind)
         fields["human_score"] = body.human_score
+    if body.human_confidence is not None:
+        # "Not sure - ask an expert" lands here: downgrade the confidence, keep the score.
+        fields["human_confidence"] = body.human_confidence
     updated = repo.update_answer(obs_id, indicator_id, fields)
     event = "human_used_ai" if body.used_ai_answer else "human_kept_own"
     _audit_best_effort(
@@ -257,7 +295,7 @@ def choose_answer(
     return _answer_out(updated)
 
 
-@router.post("/observations/{obs_id}/submit", response_model=ObservationOut)
+@router.post("/observations/{obs_id}/submit", response_model=SubmitResult)
 def submit(
     obs_id: str,
     user: CurrentUser = Depends(_user),
@@ -272,12 +310,23 @@ def submit(
     if missing:
         raise AppError(422, "MISSING_INDICATORS", "Please answer: " + ", ".join(missing))
 
-    issues = check_observation(obs, answers)
+    cfg = load_game_config()
+    issues = check_observation(obs, answers, cfg)
     profile = repo.get_profile(user.id)
     observer_accuracy = profile.get("observer_accuracy") if profile else None
     trust = compute_trust(obs, answers, load_indicators(), observer_accuracy, issues)
 
     status = "needs_review" if trust["needs_review"] else "submitted"
+
+    site_id = obs.get("site_id")
+    if site_id is None and obs.get("lat") is not None and obs.get("lng") is not None:
+        # Named only if the citizen offered a name on the site step; otherwise it shows as
+        # coordinates until somebody names it. Best-effort: a site is metadata, and failing
+        # to create one must not cost the citizen their submission.
+        try:
+            site_id = repo.create_site(obs["lat"], obs["lng"], None)["id"]
+        except Exception:
+            logger.exception("site_create_failed", extra={"extra_fields": {"observation_id": obs_id}})
 
     one_health = None
     try:
@@ -293,6 +342,7 @@ def submit(
             "trust_score": trust["score"],
             "trust_breakdown": trust,
             "one_health": one_health,
+            "site_id": site_id,
         },
     )
 
@@ -305,10 +355,17 @@ def submit(
     # Points for a stream check start PENDING: being right is what pays, not posting. They
     # settle when the crowd verifies (routers/play.py) or an expert reviews (Phase 4).
     # Best-effort: a failed ledger write must never cost the citizen their submission.
+    pending_points = 0
     try:
         rows = points.pending_rows_for_submit(user.id, answers)
         existing = {points.dedupe_key(p) for p in repo.list_points(user.id)}
         repo.insert_points(points.filter_new(rows, existing))
+        answer_ids = {a["id"] for a in answers if a.get("id")}
+        pending_points = sum(
+            p["amount"]
+            for p in repo.list_points(user.id, status=points.PENDING)
+            if p["ref_id"] in answer_ids
+        )
     except Exception:
         logger.exception("pending_points_failed", extra={"extra_fields": {"observation_id": obs_id}})
 
@@ -321,7 +378,12 @@ def submit(
     log_event("trust_computed", observation_id=obs_id, score=trust["score"], needs_review=trust["needs_review"])
 
     answers = repo.list_answers(obs_id)  # refreshed, so the response reflects the new flags
-    return _observation_out(obs, answers, storage)
+    return SubmitResult(
+        **_observation_out(obs, answers, storage).model_dump(),
+        pending_points=pending_points,
+        routed_to="expert" if status == "needs_review" else "crowd",
+        routing_reasons=[i["code"] for i in issues],
+    )
 
 
 @router.get("/observations/mine", response_model=ObservationPage)

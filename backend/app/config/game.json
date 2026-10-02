@@ -37,6 +37,11 @@
     "exclude_own_crew": true,
     "gold_blind": true
   },
+  "stream_check": {
+    "disagreement_card_min_diff": 2,
+    "unsure_answers_to_review": 1,
+    "site_match_radius_m": 150
+  },
   "blind_spot": {
     "min_votes": 3,
     "min_abs_error": 0.75
