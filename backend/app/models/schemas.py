@@ -179,6 +179,9 @@ class ReviewDetail(ObservationOut):
     citizen_display_name: str | None = None
     citizen_observer_accuracy: float | None = None
     audit_ok: bool = True
+    # Phase 4: what the crowd made of each answer, and why this landed on the queue.
+    crowd: list["CrowdPanelOut"] = []
+    routing_reasons: list[str] = []
 
 
 # ---------- v3: audit log ----------
@@ -402,3 +405,47 @@ class NearestSiteOut(BaseModel):
     site: SiteOut | None = None
     distance_m: float | None = None
     radius_m: int
+
+
+# ---------- Phase 4: expert upgrades ----------
+class CrowdVoteBucket(BaseModel):
+    """One bar of the votes histogram: how many Guardians chose this score.
+
+    A count per score and nothing else - no voter ids, no names. An expert needs the shape
+    of the disagreement, not who said what.
+    """
+
+    score: int
+    count: int
+
+
+class CrowdPanelOut(BaseModel):
+    indicator_id: str
+    label: str
+    crowd_score: float | None = None
+    crowd_votes: int = 0
+    crowd_status: str | None = None
+    histogram: list[CrowdVoteBucket] = []
+    excluded_count: int = 0
+    human_confidence: Confidence | None = None
+
+
+class ReviewStatsOut(BaseModel):
+    """"Only X% of observations needed you." The cost argument for the whole design."""
+
+    total_submitted: int
+    needed_expert: int
+    share_needed_expert: float | None
+    crowd_verified: int
+
+
+class MakeGoldIn(BaseModel):
+    indicator_id: str
+    explanation: str = Field(min_length=10, max_length=400)
+
+
+class MakeGoldOut(BaseModel):
+    id: str
+    indicator_id: str
+    expert_score: int
+    explanation: str
