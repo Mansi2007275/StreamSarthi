@@ -1,101 +1,161 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import LessonCard from "@/components/LessonCard";
-import StatusBadge from "@/components/StatusBadge";
 import { api, friendlyMessage } from "@/lib/api";
-import { useMe } from "@/lib/useMe";
-import type { ObservationPage } from "@/lib/types";
+import type { Home as HomeData } from "@/lib/types";
 
 function Dashboard() {
-  const [page, setPage] = useState<ObservationPage | null>(null);
+  const [data, setData] = useState<HomeData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const me = useMe();
+  const [dismissed, setDismissed] = useState<string[]>([]);
 
-  useEffect(() => {
-    api.mine(0, 3).then(setPage).catch((e) => setError(friendlyMessage(e)));
+  const load = useCallback(() => {
+    api.home().then(setData).catch((e) => setError(friendlyMessage(e)));
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function markSeen(id: string) {
+    setDismissed((d) => [...d, id]); // optimistic: the card goes at once
+    try {
+      await api.markReceiptSeen(id);
+    } catch {
+      setDismissed((d) => d.filter((x) => x !== id)); // put it back if the server disagreed
+    }
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-3 rounded-2xl bg-white p-5 text-center shadow-sm">
+        <p className="text-sm text-red-700">{error}</p>
+        <button onClick={load} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="space-y-3">
+        <div className="skeleton h-24" />
+        <div className="skeleton h-28" />
+        <div className="skeleton h-28" />
+      </div>
+    );
+  }
+
+  const receipts = data.receipts.filter((r) => !dismissed.includes(r.id));
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <section className="rounded-2xl bg-brand-600 p-5 text-white">
-        <h1 className="text-2xl font-semibold">Check a stream</h1>
+        <p className="text-sm text-brand-50">Hello {data.display_name ?? "there"}</p>
+        <h1 className="text-2xl font-semibold">{data.level.label}</h1>
         <p className="mt-1 text-brand-50">
-          Take photos, give your score, and get an AI second opinion. You always make the final call.
+          <span className="text-xl font-bold">{data.points.awarded}</span> points
+          {data.points.pending > 0 && <span className="text-sm"> · {data.points.pending} pending</span>}
         </p>
-        <Link
-          href="/assess"
-          className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-white px-5 font-semibold text-brand-700"
-        >
-          + New assessment
-        </Link>
       </section>
 
-      {/* Onboarding is the gold practice round now. A card rather than a forced redirect,
-          so someone who skipped it can still get back to it. */}
-      {me && !me.onboarded_at && (
-        <Link href="/welcome" className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
-          <span className="text-sm text-amber-900">
-            <span className="font-semibold">New here?</span> Try 4 practice photos — 2 minutes, and it shows what you
-            read well.
-          </span>
-          <span aria-hidden className="text-amber-700">
-            →
-          </span>
-        </Link>
-      )}
-
-      {me?.onboarded_at && (
-        <Link href="/play" className="flex items-center justify-between rounded-2xl border border-brand-200 bg-brand-50 p-4">
-          <span className="text-sm text-brand-900">
-            <span className="font-semibold">Spot Check</span> — score 5 photos and help verify other Guardians&apos;
-            reports.
-          </span>
-          <span aria-hidden className="text-brand-700">
-            →
-          </span>
-        </Link>
-      )}
-
-      <LessonCard />
-
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-semibold">Recent observations</h2>
-          <Link href="/observations" className="text-sm text-brand-700">
-            See all
-          </Link>
-        </div>
-        {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        {!page && !error && (
-          <div className="space-y-2">
-            <div className="skeleton h-16" />
-            <div className="skeleton h-16" />
-          </div>
-        )}
-        {page && page.items.length === 0 && (
-          <p className="rounded-xl border border-dashed border-line bg-white p-6 text-center text-muted">
-            No observations yet. Your first one takes about 3 minutes.
+      {/* A brand new player gets one instruction and nothing to scroll past. */}
+      {!data.onboarded ? (
+        <Link href="/welcome" className="block rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <p className="font-semibold text-amber-900">Start your practice round</p>
+          <p className="mt-1 text-sm text-amber-900">
+            Four photos, two minutes. You will see how close you are to an expert, and what you already read well.
           </p>
-        )}
-        <ul className="space-y-2">
-          {page?.items.map((o) => (
-            <li key={o.id}>
-              <Link href={`/observations/${o.id}`} className="flex items-center justify-between rounded-xl border border-line bg-white p-3">
-                <span className="text-sm">{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</span>
-                <StatusBadge status={o.status} />
+          <p className="mt-2 text-sm font-medium text-amber-800">Begin →</p>
+        </Link>
+      ) : (
+        <>
+          {receipts.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted">
+                What your work did{data.unseen_receipts > receipts.length && ` (${data.unseen_receipts} new)`}
+              </h2>
+              {receipts.map((r) => (
+                <article key={r.id} className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                  <p className="text-sm text-brand-900">{r.message}</p>
+                  <button
+                    onClick={() => markSeen(r.id)}
+                    className="mt-2 min-h-11 rounded-xl bg-white px-4 text-sm font-medium text-brand-700"
+                  >
+                    Got it
+                  </button>
+                </article>
+              ))}
+            </section>
+          )}
+
+          {data.lesson && (
+            <Link href="/observations" className="block rounded-2xl border border-sky-200 bg-sky-50 p-4">
+              <p className="text-sm font-semibold text-sky-900">Today&apos;s lesson · {data.lesson.indicator_label}</p>
+              <p className="mt-1 text-sm text-sky-900">
+                You scored {data.lesson.your_label ?? data.lesson.your_score}, the expert said{" "}
+                {data.lesson.expert_label ?? data.lesson.expert_score}.
+              </p>
+              <p className="mt-1 text-sm text-sky-800">{data.lesson.why}</p>
+            </Link>
+          )}
+
+          {data.quest && (
+            <section className="rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="font-semibold">{data.quest.label}</p>
+                <span className="shrink-0 text-sm text-muted">
+                  {data.quest.current}/{data.quest.target}
+                </span>
+              </div>
+              <p className="mt-0.5 text-sm text-muted">{data.quest.description}</p>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
+                <div
+                  className="motion-safe:transition-all h-full rounded-full bg-brand-500"
+                  style={{ width: `${data.quest.percent}%` }}
+                />
+              </div>
+              <Link
+                href={data.quest.type === "spot_check_count" ? "/play" : "/assess"}
+                className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white"
+              >
+                {data.quest.type === "spot_check_count" ? "Play Spot Check" : "Check a stream"}
               </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
+            </section>
+          )}
+
+          {receipts.length === 0 && !data.lesson && !data.quest && (
+            <section className="rounded-2xl bg-white p-5 text-center shadow-sm">
+              <p className="font-semibold">All caught up</p>
+              <p className="mt-1 text-sm text-muted">
+                Nothing waiting for you. Check a stream, or help verify someone else&apos;s photos.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link
+                  href="/assess"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-600 font-semibold text-white"
+                >
+                  Check a stream
+                </Link>
+                <Link
+                  href="/play"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line font-medium"
+                >
+                  Play Spot Check
+                </Link>
+              </div>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-export default function Home() {
+export default function HomePage() {
   return (
     <AuthGuard>
       <Dashboard />

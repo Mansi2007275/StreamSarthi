@@ -24,6 +24,8 @@ class RepoProtocol(Protocol):
     def create_observation(self, user_id: str, lat: float | None, lng: float | None) -> dict: ...
     def get_observation(self, obs_id: str) -> dict | None: ...
     def list_observations(self, user_id: str, offset: int, limit: int) -> tuple[list[dict], int]: ...
+    def list_observations_since(self, user_id: str, since_iso: str) -> list[dict]: ...
+    def list_answers_for_user(self, user_id: str) -> list[dict]: ...
     def update_observation(self, obs_id: str, fields: dict[str, Any]) -> dict: ...
     def upsert_answer(self, row: dict[str, Any]) -> dict: ...
     def get_answer(self, obs_id: str, indicator_id: str) -> dict | None: ...
@@ -63,7 +65,10 @@ class RepoProtocol(Protocol):
     def list_points(self, user_id: str, status: str | None = None) -> list[dict]: ...
     def settle_points(self, updates: list[dict[str, Any]]) -> int: ...
     def insert_receipt(self, row: dict[str, Any]) -> dict: ...
-    def list_receipts(self, user_id: str, unseen_only: bool = False, limit: int = 20) -> list[dict]: ...
+    def list_receipts(
+        self, user_id: str, unseen_only: bool = False, limit: int = 20, offset: int = 0
+    ) -> list[dict]: ...
+    def count_receipts(self, user_id: str, unseen_only: bool = False) -> int: ...
     def get_receipt(self, receipt_id: str) -> dict | None: ...
     def mark_receipt_seen(self, receipt_id: str) -> dict: ...
     def list_user_badges(self, user_id: str) -> list[dict]: ...
@@ -100,7 +105,7 @@ class SupabaseRepo:
     def list_observations(self, user_id, offset, limit):
         res = (
             self.db.table("observations")
-            .select("*", count="exact")
+            .select("*")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .range(offset, offset + limit - 1)
@@ -241,6 +246,34 @@ class SupabaseRepo:
         res = self.db.table("lessons").update({"seen": True, "seen_at": now_iso()}).eq("id", lesson_id).execute()
         return res.data[0]
 
+    def list_observations_since(self, user_id, since_iso):
+        """This user's observations submitted on or after a timestamp, for the weekly quest."""
+        res = (
+            self.db.table("observations")
+            .select("id, status, crowd_verified, submitted_at, site_id, lat, lng")
+            .eq("user_id", user_id)
+            .gte("submitted_at", since_iso)
+            .execute()
+        )
+        return res.data or []
+
+    def list_answers_for_user(self, user_id):
+        """Every answer this user has given, with the crowd/expert verdicts the profile needs."""
+        res = (
+            self.db.table("indicator_answers")
+            .select(
+                "id, observation_id, indicator_id, human_score, ai_score, used_ai_answer, expert_score, "
+                "crowd_score, crowd_status, observations!inner(user_id)"
+            )
+            .eq("observations.user_id", user_id)
+            .execute()
+        )
+        rows = []
+        for r in res.data or []:
+            r.pop("observations", None)
+            rows.append(r)
+        return rows
+
     def list_map_observations(self, statuses):
         res = (
             self.db.table("observations")
@@ -302,7 +335,7 @@ class SupabaseRepo:
         """Everything this player has already judged, so a round never offers it twice."""
         res = (
             self.db.table("validation_votes")
-            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct")
+            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct, created_at")
             .eq("voter_id", voter_id)
             .execute()
         )
@@ -391,11 +424,23 @@ class SupabaseRepo:
     def insert_receipt(self, row):
         return self.db.table("receipts").insert(row).execute().data[0]
 
-    def list_receipts(self, user_id, unseen_only=False, limit=20):
-        q = self.db.table("receipts").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit)
+    def list_receipts(self, user_id, unseen_only=False, limit=20, offset=0):
+        q = (
+            self.db.table("receipts")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+        )
         if unseen_only:
             q = q.eq("seen", False)
         return q.execute().data or []
+
+    def count_receipts(self, user_id, unseen_only=False):
+        q = self.db.table("receipts").select("id", count="exact").eq("user_id", user_id)
+        if unseen_only:
+            q = q.eq("seen", False)
+        return q.execute().count or 0
 
     def get_receipt(self, receipt_id):
         res = self.db.table("receipts").select("*").eq("id", receipt_id).limit(1).execute()

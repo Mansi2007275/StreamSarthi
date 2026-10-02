@@ -449,3 +449,124 @@ class MakeGoldOut(BaseModel):
     indicator_id: str
     expert_score: int
     explanation: str
+
+
+# ---------- Phase 5: Home and Profile ----------
+class ReceiptOut(BaseModel):
+    id: str
+    kind: str
+    message: str
+    ref_id: str | None = None
+    seen: bool
+    created_at: str | None = None
+
+
+class ReceiptsPage(BaseModel):
+    items: list[ReceiptOut]
+    total: int
+    unseen_count: int
+    offset: int
+    limit: int
+
+
+class LevelOut(BaseModel):
+    id: str
+    label: str
+    index: int
+
+
+class LevelRequirementOut(BaseModel):
+    key: str
+    label: str
+    current: float
+    target: float
+    met: bool
+
+
+class NextLevelOut(BaseModel):
+    id: str
+    label: str
+    percent: int
+    requirements: list[LevelRequirementOut]
+    # One plain sentence of what is missing, so the UI never has to compose it.
+    summary: str
+
+
+class PointsOut(BaseModel):
+    awarded: int
+    pending: int
+
+
+class QuestOut(BaseModel):
+    id: str
+    label: str
+    description: str
+    type: str
+    window: str
+    target: int
+    current: int
+    done: bool
+    percent: int
+
+
+class HomeOut(BaseModel):
+    """Everything Home needs, in one call. Cards the client should hide come back empty."""
+
+    display_name: str | None
+    level: LevelOut
+    points: PointsOut
+    onboarded: bool
+    receipts: list[ReceiptOut] = []
+    unseen_receipts: int = 0
+    lesson: LessonOut | None = None
+    quest: QuestOut | None = None
+
+
+class SkillRowOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    accuracy: float | None
+    weight: float
+    # strong | ok | focus | unknown  (weak is shown as "focus": something to work on)
+    standing: str
+
+
+class WeeklyAccuracyOut(BaseModel):
+    week_start: str
+    n: int
+    accuracy: float | None
+
+
+class BlindSpotOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    mean_signed_error: float
+    direction: str
+    message: str
+
+
+class BadgeOut(BaseModel):
+    id: str
+    label: str
+    description: str
+    icon: str
+    unlocked: bool
+    current: int
+    target: int
+
+
+class ProfileOut(BaseModel):
+    display_name: str | None
+    role: str
+    level: LevelOut
+    next_level: NextLevelOut | None
+    points: PointsOut
+    gold_votes: int
+    gold_accuracy: float | None
+    verified_checks: int
+    accuracy_by_week: list[WeeklyAccuracyOut]
+    skill_map: list[SkillRowOut]
+    blind_spots: list[BlindSpotOut]
+    badges: list[BadgeOut]

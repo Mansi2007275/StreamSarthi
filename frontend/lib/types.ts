@@ -394,3 +394,109 @@ export type MadeGold = {
   expert_score: number;
   explanation: string;
 };
+
+// ---------- Phase 5: Home and Profile ----------
+export type Receipt = {
+  id: string;
+  kind: string;
+  message: string;
+  ref_id: string | null;
+  seen: boolean;
+  created_at: string | null;
+};
+
+export type ReceiptsPage = {
+  items: Receipt[];
+  total: number;
+  unseen_count: number;
+  offset: number;
+  limit: number;
+};
+
+export type Level = { id: string; label: string; index: number };
+
+export type LevelRequirement = {
+  key: string;
+  label: string;
+  current: number;
+  target: number;
+  met: boolean;
+};
+
+export type NextLevel = {
+  id: string;
+  label: string;
+  percent: number;
+  requirements: LevelRequirement[];
+  summary: string;
+};
+
+export type Points = { awarded: number; pending: number };
+
+export type Quest = {
+  id: string;
+  label: string;
+  description: string;
+  type: string;
+  window: string;
+  target: number;
+  current: number;
+  done: boolean;
+  percent: number;
+};
+
+export type Home = {
+  display_name: string | null;
+  level: Level;
+  points: Points;
+  onboarded: boolean;
+  receipts: Receipt[];
+  unseen_receipts: number;
+  lesson: Lesson | null;
+  quest: Quest | null;
+};
+
+export type SkillRow = {
+  indicator_id: string;
+  label: string;
+  n: number;
+  accuracy: number | null;
+  weight: number;
+  standing: "strong" | "ok" | "focus" | "unknown";
+};
+
+export type WeeklyAccuracy = { week_start: string; n: number; accuracy: number | null };
+
+export type BlindSpot = {
+  indicator_id: string;
+  label: string;
+  n: number;
+  mean_signed_error: number;
+  direction: string;
+  message: string;
+};
+
+export type Badge = {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  current: number;
+  target: number;
+};
+
+export type Profile = {
+  display_name: string | null;
+  role: Role;
+  level: Level;
+  next_level: NextLevel | null;
+  points: Points;
+  gold_votes: number;
+  gold_accuracy: number | null;
+  verified_checks: number;
+  accuracy_by_week: WeeklyAccuracy[];
+  skill_map: SkillRow[];
+  blind_spots: BlindSpot[];
+  badges: Badge[];
+};
