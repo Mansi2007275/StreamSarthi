@@ -4,48 +4,83 @@
     "label": "First Look",
     "description": "Finish the practice round.",
     "icon": "eye",
-    "rule": { "type": "onboarded" }
+    "rule": {
+      "type": "onboarded"
+    }
   },
   {
     "id": "five_indicators",
     "label": "All-Rounder",
     "description": "Get verified answers on 5 different indicators.",
     "icon": "grid",
-    "rule": { "type": "distinct_verified_indicators", "min": 5 }
+    "rule": {
+      "type": "distinct_verified_indicators",
+      "min": 5
+    }
   },
   {
     "id": "three_sites",
     "label": "Wanderer",
     "description": "Complete verified checks at 3 different sites.",
     "icon": "map-pin",
-    "rule": { "type": "distinct_verified_sites", "min": 3 }
+    "rule": {
+      "type": "distinct_verified_sites",
+      "min": 3
+    }
   },
   {
     "id": "gold_10",
     "label": "Sharp Eye",
     "description": "Match the expert on 10 practice photos.",
     "icon": "target",
-    "rule": { "type": "gold_matches", "min": 10 }
+    "rule": {
+      "type": "gold_matches",
+      "min": 10
+    }
   },
   {
     "id": "monsoon_check",
     "label": "Monsoon Watcher",
     "description": "Complete a verified check between June and September.",
     "icon": "cloud-rain",
-    "rule": { "type": "verified_check_in_months", "months": [6, 7, 8, 9] }
+    "rule": {
+      "type": "verified_check_in_months",
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ]
+    }
   },
   {
     "id": "caught_one",
     "label": "Error Catcher",
     "description": "Your vote was part of a crowd that spotted a mistake, and the expert agreed with the crowd.",
     "icon": "search-check",
-    "rule": { "type": "caught_errors", "min": 1 }
+    "rule": {
+      "type": "caught_errors",
+      "min": 1
+    }
   },
   {
     "id": "steady_guardian",
     "label": "Steady Guardian",
     "description": "Check an adopted site 3 months in a row.",
     "icon": "calendar-check",
-    "rule": { "type": "adopted_streak", "min": 3 }
+    "rule": {
+      "type": "adopted_streak",
+      "min": 3
+    }
+  },
+  {
+    "id": "station_keeper",
+    "label": "Station Keeper",
+    "description": "Check a stream by scanning a Stream Station poster.",
+    "icon": "qr-code",
+    "rule": {
+      "type": "station_checks",
+      "min": 1
+    }
   }
 ]

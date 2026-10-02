@@ -3,16 +3,50 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
+import LivingRiver from "@/components/LivingRiver";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Home as HomeData } from "@/lib/types";
+
+const RIVER_SEEN_KEY = "streamsaathi.river.stage";
+
+function readSeenStage(): number | null {
+  try {
+    const raw = window.localStorage.getItem(RIVER_SEEN_KEY);
+    return raw === null ? null : Number(raw);
+  } catch {
+    return null; // private window, or site data blocked
+  }
+}
+
+function writeSeenStage(stage: number): void {
+  try {
+    window.localStorage.setItem(RIVER_SEEN_KEY, String(stage));
+  } catch {
+    // Not worth telling anybody about: they just see the banner once more next time.
+  }
+}
 
 function Dashboard() {
   const [data, setData] = useState<HomeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [grewTo, setGrewTo] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    api.home().then(setData).catch((e) => setError(friendlyMessage(e)));
+    api
+      .home()
+      .then((home) => {
+        setData(home);
+        // Celebrate a stage once, on the first Home visit after it was reached.
+        if (home.river) {
+          const seen = readSeenStage();
+          if (seen !== null && home.river.stage_index > seen) {
+            setGrewTo(home.river.stage_label);
+          }
+          writeSeenStage(home.river.stage_index);
+        }
+      })
+      .catch((e) => setError(friendlyMessage(e)));
   }, []);
 
   useEffect(() => {
@@ -53,6 +87,28 @@ function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {data.river && <LivingRiver river={data.river} />}
+
+      {grewTo && (
+        <div
+          className="pop-in rounded-2xl border border-brand-200 bg-brand-50 p-4 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-2xl" aria-hidden>
+            🎉
+          </p>
+          <p className="mt-1 font-semibold text-brand-800">Your river grew: {grewTo}</p>
+          <p className="mt-1 text-sm text-brand-900">That came from work other people confirmed.</p>
+          <button
+            onClick={() => setGrewTo(null)}
+            className="mt-2 min-h-11 w-full rounded-xl bg-white text-sm font-medium text-brand-700"
+          >
+            Lovely
+          </button>
+        </div>
+      )}
+
       <section className="rounded-2xl bg-brand-600 p-5 text-white">
         <p className="text-sm text-brand-50">Hello {data.display_name ?? "there"}</p>
         <h1 className="text-2xl font-semibold">{data.level.label}</h1>

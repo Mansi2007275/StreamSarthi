@@ -44,6 +44,10 @@ def _adopted_streak(rule, stats):
     return (stats.get("adopted_streak") or 0) >= rule["min"]
 
 
+def _station_checks(rule, stats):
+    return (stats.get("station_checks") or 0) >= rule["min"]
+
+
 RULES = {
     "onboarded": _onboarded,
     "distinct_verified_indicators": _distinct_verified_indicators,
@@ -52,6 +56,7 @@ RULES = {
     "verified_check_in_months": _verified_check_in_months,
     "caught_errors": _caught_errors,
     "adopted_streak": _adopted_streak,
+    "station_checks": _station_checks,
 }
 
 _REQUIRED_FIELDS = ("id", "label", "description", "icon", "rule")

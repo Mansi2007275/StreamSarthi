@@ -45,6 +45,8 @@ class ObservationCreate(BaseModel):
     # place and may have named it. Neither given -> a site is created unnamed on submit.
     site_id: str | None = None
     site_name: str | None = Field(default=None, max_length=80)
+    # 'station' when the citizen arrived by scanning a poster at the water's edge.
+    source: Literal["app", "station"] = "app"
 
 
 class ObservationCreated(BaseModel):
@@ -119,6 +121,8 @@ class ObservationOut(BaseModel):
     review_note: str | None = None
     reviewed_at: datetime | None = None
     one_health: dict | None = None
+    site_id: str | None = None   # lets a reviewer open this site's station poster
+    source: str = "app"
     answers: list[AnswerOut] = []
 
 
@@ -236,6 +240,7 @@ class MapPointOut(BaseModel):
     submitted_at: str | None
     is_mine: bool
     can_open: bool
+    from_station: bool = False
 
 
 class MapResponse(BaseModel):
@@ -522,6 +527,7 @@ class HomeOut(BaseModel):
     quest: QuestOut | None = None
     # Card (d): only set when an adopted site actually wants a visit. Crews stay out until Phase 7.
     due_site: "DueSiteOut | None" = None
+    river: "RiverOut | None" = None
 
 
 class SkillRowOut(BaseModel):
@@ -568,6 +574,7 @@ class ProfileOut(BaseModel):
     gold_votes: int
     gold_accuracy: float | None
     verified_checks: int
+    practice_xp: int = 0   # replay XP: encouragement only, never points
     accuracy_by_week: list[WeeklyAccuracyOut]
     skill_map: list[SkillRowOut]
     blind_spots: list[BlindSpotOut]
@@ -635,3 +642,67 @@ class DueSiteOut(BaseModel):
     name: str | None
     due_status: Literal["due_soon", "due"]
     streak_months: int
+
+
+# ---------- Stream Stations ----------
+class StationDotOut(BaseModel):
+    month: str
+    level: str | None
+
+
+class StationOut(BaseModel):
+    """The public face of a site. Deliberately has no field for a person.
+
+    Anybody with the poster can read this without logging in, so it carries aggregates only:
+    counts, levels and a rounded location. No user ids, names, emails or photos.
+    """
+
+    site_id: str
+    station_number: int | None
+    name: str | None
+    lat: float | None
+    lng: float | None
+    last_check: str | None
+    days_since_check: int | None
+    total_checks: int
+    waiting_for_check: bool
+    one_health_level: str | None
+    headline: str | None
+    recent_months: list[StationDotOut] = []
+
+
+# ---------- practice replay ----------
+class PracticeAttemptIn(BaseModel):
+    gold_item_id: str
+    score: int
+
+
+class PracticeRevealOut(BaseModel):
+    """Same shape of feedback as a first vote, minus anything that could be earned.
+
+    `points_awarded` is deliberately absent: a replay pays XP and nothing else.
+    """
+
+    status: Literal["replay"] = "replay"
+    expert_score: int
+    expert_label: str | None
+    explanation: str
+    matched: bool
+    close: bool
+    xp_awarded: int
+    total_xp: int
+
+
+# ---------- Living River ----------
+class RiverOut(BaseModel):
+    """The Home hero. Driven only by confirmed work, so it cannot be filled by posting."""
+
+    stage_index: int
+    stage_id: str
+    stage_label: str
+    total_stages: int
+    shows: list[str] = []
+    caption: str
+    next_hint: str | None = None
+    next_stage_label: str | None = None
+    metrics: dict[str, int] = {}

@@ -27,12 +27,14 @@ from app.models.schemas import (
     ProfileOut,
     ReceiptOut,
     ReceiptsPage,
+    RiverOut,
     SkillRowOut,
     WeeklyAccuracyOut,
 )
 from app.routers.lessons import _lesson_out
 from app.services import adoption, blind_spots, points, progress, quests
 from app.services import badges as badges_svc
+from app.services import river as river_svc
 from app.services.db import RepoProtocol, get_repo
 from app.services.game import skill_map
 from app.services.game_config import load_game_config
@@ -90,6 +92,10 @@ def _gather(repo: RepoProtocol, user_id: str) -> tuple[dict, list[dict], dict]:
     streak = adoption.streak_for_badge(_my_check_dates_by_site(repo, user_id))
     stats = progress.player_stats(
         gold_votes, observations, answers_by_obs, profile, caught_errors=caught, adopted_streak=streak
+    )
+    # Station Keeper: arrived via a QR poster at least once.
+    stats["station_checks"] = sum(
+        1 for o in observations if o.get("source") == "station" and o.get("submitted_at")
     )
     return stats, gold_votes, profile
 
@@ -166,6 +172,8 @@ def home(
     repo.ensure_profile(user.id, user.email)
     stats, _, profile = _gather(repo, user.id)
 
+    river = RiverOut(**river_svc.river_state(stats))
+
     if not stats["onboarded"]:
         # A brand new player gets one instruction and nothing to scroll past.
         return HomeOut(
@@ -173,6 +181,7 @@ def home(
             level=LevelOut(**level_for(stats, cfg)),
             points=_points_out(repo, user.id),
             onboarded=False,
+            river=river,
         )
 
     receipts = repo.list_receipts(user.id, unseen_only=True, limit=HOME_RECEIPTS)
@@ -189,6 +198,7 @@ def home(
         lesson=_lesson_out(lesson) if lesson else None,
         quest=quest,
         due_site=_due_site(repo, user.id, cfg),
+        river=river,
     )
 
 
@@ -232,6 +242,7 @@ def my_profile(
         gold_votes=stats["gold_votes"],
         gold_accuracy=stats["gold_accuracy"],
         verified_checks=stats["verified_checks"],
+        practice_xp=sum(int(a.get("xp") or 0) for a in repo.list_practice_attempts(user.id)),
         accuracy_by_week=[WeeklyAccuracyOut(**w) for w in progress.weekly_accuracy(gold_votes)],
         skill_map=[
             SkillRowOut(**{**row, "standing": _STANDING_LABEL.get(row["standing"], row["standing"])})

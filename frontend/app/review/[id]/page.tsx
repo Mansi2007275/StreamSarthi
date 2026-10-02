@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- signed Supabase URLs, next/image would need remotePatterns */
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import AuditTimeline from "@/components/AuditTimeline";
@@ -144,6 +145,19 @@ function Detail() {
           </div>
         )}
       </div>
+
+      {obs.site_id && (
+        <Link
+          href={`/s/${obs.site_id}/poster`}
+          className="flex items-center justify-between rounded-2xl border border-line bg-white p-4 text-sm"
+        >
+          <span>
+            <span className="font-semibold">Get a station poster for this site</span>
+            <span className="mt-0.5 block text-muted">A printable QR sign anyone can scan at the water.</span>
+          </span>
+          <span aria-hidden className="text-brand-700">→</span>
+        </Link>
+      )}
 
       <TrustCard trust={obs.trust_breakdown} />
       <OneHealthCard oneHealth={obs.one_health} />

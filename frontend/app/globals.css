@@ -77,3 +77,70 @@ body {
   .skeleton { animation: none; background: #e7efed; }
   .confetti-piece { display: none; }
 }
+
+/* ---------- Stream Station poster ----------
+   On screen the poster is a preview card. In print it is the page: the app chrome goes away
+   and the poster fills a single A4 sheet. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+  nav,
+  header,
+  footer,
+  .print\:hidden {
+    display: none !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .poster {
+    border: none !important;
+    box-shadow: none !important;
+    /* Fits one sheet inside the 12mm margins, and never spills onto a second. */
+    height: 273mm;
+    justify-content: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* A station-sourced check on the map: same colour scale, unmistakably different rim. */
+.station-marker {
+  stroke: #0f9f8f !important;
+  stroke-width: 4 !important;
+  stroke-dasharray: none !important;
+}
+
+/* ---------- Living River idle motion ----------
+   Transforms only, so the browser can keep it on the compositor. The global
+   prefers-reduced-motion rule above already collapses these to a standstill: the scene
+   stays complete, it simply stops moving. */
+@keyframes river-drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(160px); }
+}
+@keyframes river-swim {
+  from { transform: translateX(-30px); }
+  to   { transform: translateX(350px); }
+}
+@keyframes river-glide {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+.river-flow { animation: river-drift 9s linear infinite; }
+.river-fish { animation: river-swim 14s linear infinite; }
+.river-birds { animation: river-glide 6s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Park the swimmers inside the frame rather than off at their start position. */
+  .river-fish { animation: none; transform: translateX(150px); }
+  .river-flow,
+  .river-birds { animation: none; }
+}

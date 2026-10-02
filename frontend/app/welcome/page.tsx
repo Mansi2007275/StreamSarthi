@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import GoldReveal from "@/components/GoldReveal";
 import PhotoQuestion from "@/components/PhotoQuestion";
-import { api, friendlyMessage } from "@/lib/api";
+import { ApiError, api, friendlyMessage } from "@/lib/api";
 import type { GoldReveal as GoldRevealData, OnboardingResult, PlayItem } from "@/lib/types";
 
 const SLIDES = [
@@ -100,6 +100,7 @@ function Welcome() {
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState<number | null>(null);
   const [reveal, setReveal] = useState<GoldRevealData | null>(null);
+  const [alreadyDone, setAlreadyDone] = useState(false);
   const [result, setResult] = useState<OnboardingResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -180,7 +181,12 @@ function Welcome() {
       const r = await api.playVote("gold", item.id, score, null);
       if (r.status === "revealed") setReveal(r);
     } catch (e) {
-      setError(friendlyMessage(e));
+      // Already answered (a reload, a second tab): not a failure, so don't alarm them.
+      if (e instanceof ApiError && e.code === "ALREADY_VOTED") {
+        setAlreadyDone(true);
+      } else {
+        setError(friendlyMessage(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -191,6 +197,8 @@ function Welcome() {
       setIndex(index + 1);
       setScore(null);
       setReveal(null);
+      setAlreadyDone(false);
+      setError(null);
       return;
     }
     setBusy(true);
@@ -213,14 +221,34 @@ function Welcome() {
         scaleLabels={item.indicator.scale_labels}
         score={score}
         onScore={setScore}
-        disabled={reveal !== null || busy}
+        disabled={reveal !== null || alreadyDone || busy}
         step={index + 1}
         total={items.length}
       />
 
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="rounded-xl bg-red-50 p-3">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={next}
+            className="mt-2 min-h-11 w-full rounded-xl border border-red-200 bg-white text-sm font-medium"
+          >
+            {isLast ? "Skip and see my result" : "Skip this photo"}
+          </button>
+        </div>
+      )}
 
-      {!reveal && (
+      {alreadyDone && (
+        <div className="pop-in rounded-2xl border border-line bg-surface p-4" role="status" aria-live="polite">
+          <p className="font-semibold">You&apos;ve already checked this photo, thanks!</p>
+          <p className="mt-1 text-sm text-muted">Your earlier answer still counts.</p>
+          <button onClick={next} className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
+            {isLast ? "See my result" : "Next photo"}
+          </button>
+        </div>
+      )}
+
+      {!reveal && !alreadyDone && (
         <button
           onClick={check}
           disabled={score === null || busy}

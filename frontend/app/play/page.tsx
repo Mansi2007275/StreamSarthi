@@ -6,7 +6,7 @@ import AuthGuard from "@/components/AuthGuard";
 import ConfidencePicker from "@/components/ConfidencePicker";
 import GoldReveal from "@/components/GoldReveal";
 import PhotoQuestion from "@/components/PhotoQuestion";
-import { api, friendlyMessage } from "@/lib/api";
+import { ApiError, api, friendlyMessage } from "@/lib/api";
 import type { Confidence, GoldReveal as GoldRevealData, PlayItem, VoteAck } from "@/lib/types";
 
 type Summary = { judged: number; goldSeen: number; goldMatched: number; points: number };
@@ -18,6 +18,7 @@ function Play() {
   const [confidence, setConfidence] = useState<Confidence | null>(null);
   const [reveal, setReveal] = useState<GoldRevealData | null>(null);
   const [ack, setAck] = useState<VoteAck | null>(null);
+  const [alreadyDone, setAlreadyDone] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [tally, setTally] = useState<Summary>({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +90,15 @@ function Play() {
         >
           Check a real stream
         </Link>
-        <button onClick={loadRound} className="min-h-11 w-full rounded-xl border border-line font-medium">
-          Refresh
-        </button>
+        <Link
+          href="/play/practice"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line font-medium"
+        >
+          Replay practice photos
+        </Link>
+        <Link href="/" className="block min-h-11 pt-3 text-sm text-muted underline">
+          Back home
+        </Link>
       </div>
     );
   }
@@ -120,7 +127,13 @@ function Play() {
         <button onClick={loadRound} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
           Play another round
         </button>
-        <Link href="/" className="block min-h-11 rounded-xl border border-line pt-3 font-medium">
+        <Link
+          href="/play/practice"
+          className="block min-h-11 rounded-xl border border-line pt-3 text-center font-medium"
+        >
+          Replay practice photos
+        </Link>
+        <Link href="/" className="block min-h-11 pt-3 text-center text-sm text-muted underline">
           Back home
         </Link>
       </div>
@@ -129,7 +142,9 @@ function Play() {
 
   const item = items[index];
   const isLast = index === items.length - 1;
-  const answered = reveal !== null || ack !== null;
+  // "already voted" counts as answered: the player is finished with this photo either way,
+  // so they always get a way forward instead of a dead end.
+  const answered = reveal !== null || ack !== null || alreadyDone;
 
   async function submitVote() {
     if (score === null) return;
@@ -146,7 +161,13 @@ function Play() {
       if (result.status === "revealed") setReveal(result);
       else setAck(result);
     } catch (e) {
-      setError(friendlyMessage(e));
+      // 409 is not a failure: this photo was already judged (a second tab, a double tap, a
+      // stale round). Say so calmly and let them move on.
+      if (e instanceof ApiError && e.code === "ALREADY_VOTED") {
+        setAlreadyDone(true);
+      } else {
+        setError(friendlyMessage(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -162,6 +183,8 @@ function Play() {
     setConfidence(null);
     setReveal(null);
     setAck(null);
+    setAlreadyDone(false);
+    setError(null);
   }
 
   return (
@@ -181,7 +204,17 @@ function Play() {
 
       {!answered && <ConfidencePicker value={confidence} onChange={setConfidence} disabled={busy} />}
 
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="rounded-xl bg-red-50 p-3">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={next}
+            className="mt-2 min-h-11 w-full rounded-xl border border-red-200 bg-white text-sm font-medium"
+          >
+            {isLast ? "Skip this photo and finish" : "Skip this photo"}
+          </button>
+        </div>
+      )}
 
       {!answered && (
         <button
@@ -191,6 +224,18 @@ function Play() {
         >
           {busy ? "Saving..." : "Submit my score"}
         </button>
+      )}
+
+      {alreadyDone && (
+        <div className="pop-in rounded-2xl border border-line bg-surface p-4" role="status" aria-live="polite">
+          <p className="font-semibold">You&apos;ve already checked this photo, thanks!</p>
+          <p className="mt-1 text-sm text-muted">
+            Your earlier answer still counts. Nothing to do here again.
+          </p>
+          <button onClick={next} className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
+            {isLast ? "See my round" : "Next photo"}
+          </button>
+        </div>
       )}
 
       {reveal && <GoldReveal reveal={reveal} onNext={next} isLast={isLast} busy={busy} />}

@@ -26,12 +26,14 @@ import type {
   ObservationPage,
   OnboardingResult,
   PlayRound,
+  PracticeReveal,
   Proof,
   ReviewActionBody,
   ReviewDetail,
   ReviewQueuePage,
   ReviewStats,
   SiteTimeline,
+  Station,
   SubmitResult,
   VoteResult,
 } from "./types";
@@ -99,14 +101,21 @@ export const api = {
   createObservation: (
     lat: number | null,
     lng: number | null,
-    site: { siteId?: string | null; siteName?: string | null } = {},
+    site: { siteId?: string | null; siteName?: string | null; source?: "app" | "station" } = {},
   ) =>
     request<ObservationCreated>("/api/v1/observations", {
       method: "POST",
-      json: { lat, lng, site_id: site.siteId ?? null, site_name: site.siteName ?? null },
+      json: {
+        lat,
+        lng,
+        site_id: site.siteId ?? null,
+        site_name: site.siteName ?? null,
+        source: site.source ?? "app",
+      },
     }),
   sitesNear: (lat: number, lng: number) => request<NearestSite>(`/api/v1/sites/near?lat=${lat}&lng=${lng}`),
   myStream: () => request<MyStream>("/api/v1/my-stream"),
+  station: (siteId: string) => request<Station>(`/api/v1/stations/${siteId}`),
   adoptSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/adopt`, { method: "POST" }),
   releaseSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/release`, { method: "POST" }),
   siteTimeline: (siteId: string) => request<SiteTimeline>(`/api/v1/sites/${siteId}/timeline`),
@@ -179,6 +188,12 @@ export const api = {
   // ---------- Guardians: Spot Check ----------
   playOnboarding: () => request<PlayRound>("/api/v1/play/onboarding"),
   playRound: () => request<PlayRound>("/api/v1/play/round"),
+  practiceRound: () => request<PlayRound>("/api/v1/play/practice"),
+  practiceAttempt: (goldItemId: string, score: number) =>
+    request<PracticeReveal>("/api/v1/play/practice", {
+      method: "POST",
+      json: { gold_item_id: goldItemId, score },
+    }),
   playVote: (itemType: "gold" | "answer", id: string, score: number, confidence: Confidence | null) =>
     request<VoteResult>("/api/v1/play/vote", {
       method: "POST",

@@ -133,18 +133,20 @@ export default function MapView() {
         {points?.map((p) => {
           const { fill, dashed } = colorFor(p);
           const ring = p.status === "verified" || p.status === "corrected";
-          return (
-            <CircleMarker
-              key={p.id}
-              center={[p.lat, p.lng]}
-              radius={ring ? 9 : 7}
-              pathOptions={{
+          // A station check gets a bigger marker with a brand-coloured rim (see .station-marker
+          // in globals.css), so "a QR poster brought somebody here" reads at a glance.
+          const radius = p.from_station ? (ring ? 10 : 9) : ring ? 9 : 7;
+          const pathOptions = p.from_station
+            ? { color: "#ffffff", weight: 2, fillColor: fill, fillOpacity: 0.95, className: "station-marker" }
+            : {
                 color: ring ? "#ffffff" : fill,
                 weight: ring ? 3 : dashed ? 2 : 1,
                 dashArray: dashed ? "4 3" : undefined,
                 fillColor: fill,
                 fillOpacity: 0.9,
-              }}
+              };
+          return (
+            <CircleMarker key={p.id} center={[p.lat, p.lng]} radius={radius} pathOptions={pathOptions}
             >
               <Popup>
                 <div className="space-y-1 text-sm">
@@ -155,6 +157,7 @@ export default function MapView() {
                   </p>
                   <p className="capitalize">{p.status.replace(/_/g, " ")}</p>
                   {p.one_health_level && <p className="capitalize">One Health: {p.one_health_level}</p>}
+                  {p.from_station && <p className="text-brand-700">Started from a station poster</p>}
                   {p.can_open && (
                     <Link href={`/observations/${p.id}`} className="text-brand-700 underline">
                       Open details

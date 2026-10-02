@@ -157,7 +157,7 @@ def is_eligible_voter(stats: dict, cfg: dict | None = None) -> bool:
     )
 
 
-def _gold_item(item: dict) -> dict:
+def gold_item(item: dict) -> dict:
     return {
         "item_type": GOLD,
         "id": item["id"],
@@ -231,14 +231,14 @@ def pick_round(
     rng.shuffle(gold_pool)
 
     if user_stats.get("gold_votes", 0) < cfg["new_player_gold_only_until"]:
-        return [_gold_item(g) for g in gold_pool[:size]]
+        return [gold_item(g) for g in gold_pool[:size]]
 
     gold_count = min(size // cfg["gold_every"], len(gold_pool))
     answers = eligible_candidates(user_stats, candidate_answers, cfg)[: size - gold_count]
 
     items = [_answer_item(a) for a in answers]
     for g in gold_pool[:gold_count]:
-        items.insert(rng.randint(0, len(items)), _gold_item(g))
+        items.insert(rng.randint(0, len(items)), gold_item(g))
     return items[:size]
 
 
