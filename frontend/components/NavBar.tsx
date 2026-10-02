@@ -8,6 +8,7 @@ import { useMe } from "@/lib/useMe";
 
 const links = [
   { href: "/", label: "Home" },
+  { href: "/play", label: "Play" },
   { href: "/assess", label: "New" },
   { href: "/observations", label: "History" },
   { href: "/map", label: "Map" },

@@ -33,12 +33,27 @@ function Dashboard() {
         </Link>
       </section>
 
-      {me && !me.calibrated_at && (
-        <Link href="/calibrate" className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      {/* Onboarding is the gold practice round now. A card rather than a forced redirect,
+          so someone who skipped it can still get back to it. */}
+      {me && !me.onboarded_at && (
+        <Link href="/welcome" className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <span className="text-sm text-amber-900">
-            <span className="font-semibold">New here?</span> Take the 2-minute practice first.
+            <span className="font-semibold">New here?</span> Try 4 practice photos — 2 minutes, and it shows what you
+            read well.
           </span>
           <span aria-hidden className="text-amber-700">
+            →
+          </span>
+        </Link>
+      )}
+
+      {me?.onboarded_at && (
+        <Link href="/play" className="flex items-center justify-between rounded-2xl border border-brand-200 bg-brand-50 p-4">
+          <span className="text-sm text-brand-900">
+            <span className="font-semibold">Spot Check</span> — score 5 photos and help verify other Guardians&apos;
+            reports.
+          </span>
+          <span aria-hidden className="text-brand-700">
             →
           </span>
         </Link>

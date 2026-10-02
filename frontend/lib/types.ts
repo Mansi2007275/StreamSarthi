@@ -6,6 +6,9 @@ export type Indicator = {
   scale_labels: string[];
   photo_required: boolean;
   required: boolean;
+  higher_is_worse?: boolean;
+  /** Discriminating questions from config, shown when the citizen and the AI disagree. */
+  cross_exam?: string[];
 };
 
 export type ObservationStatus =
@@ -120,6 +123,7 @@ export type Me = {
   role: Role;
   observer_accuracy: number | null;
   calibrated_at: string | null;
+  onboarded_at: string | null;
 };
 
 // ---------- v3: expert review ----------
@@ -243,4 +247,84 @@ export type Disagreement = {
   ai_wrong_rate: number | null;
   matrix: number[][];
   scale: [number, number];
+};
+
+// ---------- Guardians: Spot Check game ----------
+export type PlayIndicator = {
+  id: string;
+  label: string;
+  help: Record<string, string>;
+  scale: [number, number];
+  scale_labels: string[];
+};
+
+export type PlayItem = {
+  item_type: "gold" | "answer";
+  id: string;
+  indicator: PlayIndicator;
+  image_url: string | null;
+};
+
+export type PlayRound = {
+  items: PlayItem[];
+  round_size: number;
+};
+
+export type Confidence = "sure" | "somewhat" | "guess";
+
+export type GoldReveal = {
+  status: "revealed";
+  expert_score: number;
+  expert_label: string | null;
+  explanation: string;
+  matched: boolean;
+  close: boolean;
+  points_awarded: number;
+};
+
+export type VoteAck = {
+  status: "thanks";
+  votes_needed: number;
+  message: string;
+};
+
+export type VoteResult = GoldReveal | VoteAck;
+
+export type OnboardingResult = {
+  matched: number;
+  total: number;
+  accuracy: number | null;
+  strongest_indicator: string | null;
+  strongest_label: string | null;
+  focus_indicator: string | null;
+  focus_label: string | null;
+  message: string | null;
+  badges: string[];
+  onboarded_at: string;
+};
+
+// ---------- Guardians: data-quality proof ----------
+export type ProofAgreement = {
+  n: number;
+  exact: number | null;
+  within_1: number | null;
+  mean_abs_error: number | null;
+};
+
+export type Proof = {
+  single_citizen_vs_expert: ProofAgreement;
+  crowd_verified_vs_expert: ProofAgreement;
+  per_indicator: {
+    indicator_id: string;
+    label: string;
+    single_citizen_vs_expert: ProofAgreement;
+    crowd_verified_vs_expert: ProofAgreement;
+  }[];
+  share_needed_expert: number | null;
+  counts: {
+    total_submitted: number;
+    needed_expert: number;
+    crowd_verified: number;
+    expert_scored_answers: number;
+  };
 };

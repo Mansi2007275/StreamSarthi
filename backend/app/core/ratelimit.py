@@ -12,9 +12,15 @@ from app.core.errors import AppError
 
 
 class RateLimiter:
-    def __init__(self, limit: int, window_seconds: float = 60.0):
+    def __init__(
+        self,
+        limit: int,
+        window_seconds: float = 60.0,
+        message: str = "Too many AI requests, wait a minute and try again",
+    ):
         self.limit = limit
         self.window = window_seconds
+        self.message = message
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = Lock()
 
@@ -25,5 +31,5 @@ class RateLimiter:
             while q and now - q[0] > self.window:
                 q.popleft()
             if len(q) >= self.limit:
-                raise AppError(429, "RATE_LIMITED", "Too many AI requests, wait a minute and try again")
+                raise AppError(429, "RATE_LIMITED", self.message)
             q.append(now)

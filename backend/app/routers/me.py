@@ -21,4 +21,5 @@ def me(
         role=profile.get("role", "citizen"),
         observer_accuracy=profile.get("observer_accuracy"),
         calibrated_at=profile.get("calibrated_at"),
+        onboarded_at=profile.get("onboarded_at"),
     )

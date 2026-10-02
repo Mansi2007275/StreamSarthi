@@ -1,0 +1,38 @@
+[
+  {
+    "id": "daily_spot_checks",
+    "scope": "personal",
+    "label": "Spot Check 3 photos today",
+    "description": "Help check three stream photos from other Guardians.",
+    "type": "spot_check_count",
+    "target": 3,
+    "window": "today"
+  },
+  {
+    "id": "weekly_stream_checks",
+    "scope": "personal",
+    "label": "2 stream checks this week",
+    "description": "Visit a stream and complete a full check, twice.",
+    "type": "stream_checks_week",
+    "target": 2,
+    "window": "week"
+  },
+  {
+    "id": "crew_sites_month",
+    "scope": "crew",
+    "label": "Cover 20 sites this month",
+    "description": "Distinct sites your crew has checked this month.",
+    "type": "crew_distinct_sites_month",
+    "target": 20,
+    "window": "month"
+  },
+  {
+    "id": "crew_recheck_after_event",
+    "scope": "crew",
+    "label": "Re-check the sites from your crew event",
+    "description": "Go back to the sites you checked on event day and see what changed.",
+    "type": "crew_recheck_after_event",
+    "active_days_after_event": 14,
+    "window": "event"
+  }
+]

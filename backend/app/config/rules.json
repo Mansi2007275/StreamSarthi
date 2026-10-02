@@ -1,18 +1,26 @@
 [
   {
-    "id": "clear_water_but_thick_film",
+    "id": "clear_water_but_heavy_discharge",
     "when": [
-      { "indicator": "water_appearance", "op": "<=", "value": 1 },
-      { "indicator": "foam_or_film", "op": ">=", "value": 4 }
+      { "indicator": "water_colour", "op": "<=", "value": 1 },
+      { "indicator": "discharge_points", "op": ">=", "value": 4 }
     ],
-    "message": "Water marked very clear, but a thick surface film is reported"
+    "message": "Water marked clear and natural, but several outlets are reported discharging"
   },
   {
     "id": "natural_banks_but_covered_in_waste",
     "when": [
-      { "indicator": "bank_vegetation", "op": "<=", "value": 1 },
-      { "indicator": "litter", "op": ">=", "value": 5 }
+      { "indicator": "riparian_vegetation", "op": "<=", "value": 1 },
+      { "indicator": "litter_debris", "op": ">=", "value": 5 }
     ],
-    "message": "Banks marked fully natural, but covered in waste"
+    "message": "Banks marked densely vegetated, but the surface is reported covered in waste"
+  },
+  {
+    "id": "concrete_channel_but_dense_vegetation",
+    "when": [
+      { "indicator": "channel_form", "op": ">=", "value": 5 },
+      { "indicator": "riparian_vegetation", "op": "<=", "value": 1 }
+    ],
+    "message": "Channel marked fully concrete or covered, but the banks are marked densely vegetated"
   }
 ]

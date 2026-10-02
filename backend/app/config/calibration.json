@@ -2,22 +2,29 @@
   {
     "id": "cal1",
     "image": "/calibration/cal1.svg",
-    "indicator_id": "water_appearance",
+    "indicator_id": "water_colour",
     "expert_score": 4,
-    "explanation": "You cannot see the bottom and the water is brown, so it is Cloudy (4)."
+    "explanation": "The water is brown and you cannot see the bottom, so it is Brown and murky (4)."
   },
   {
     "id": "cal2",
     "image": "/calibration/cal2.svg",
-    "indicator_id": "litter",
+    "indicator_id": "litter_debris",
     "expert_score": 3,
-    "explanation": "Several plastic items along the bank, but not covering it: Some (3)."
+    "explanation": "Plastic items lie along the bank without covering it, so it is Scattered waste (3)."
   },
   {
     "id": "cal3",
     "image": "/calibration/cal3.svg",
-    "indicator_id": "bank_vegetation",
+    "indicator_id": "riparian_vegetation",
     "expert_score": 2,
-    "explanation": "Most of the bank has grass and shrubs with small bare patches: Mostly covered (2)."
+    "explanation": "Most of the bank carries grass and shrubs with small bare patches: Mostly vegetated (2)."
+  },
+  {
+    "id": "cal4",
+    "image": "/calibration/cal4.svg",
+    "indicator_id": "channel_form",
+    "expert_score": 4,
+    "explanation": "The channel runs straight between reinforced banks, but is not fully covered: Straightened with hard banks (4)."
   }
 ]

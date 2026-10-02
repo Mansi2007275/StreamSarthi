@@ -14,6 +14,14 @@ class FakeRepo:
         self.lessons: dict[str, dict] = {}
         self._lesson_by_key: dict[tuple[str, str], str] = {}
         self._lesson_next_id = 1
+        # Guardians (Phase 1)
+        self.gold_items: dict[str, dict] = {}
+        self.votes: dict[str, dict] = {}
+        self.points: list[dict] = []
+        self.receipts: dict[str, dict] = {}
+        self.user_badges: list[dict] = []
+        self.sites: dict[str, dict] = {}
+        self.crews: dict[str, str] = {}  # user_id -> crew_id (Phase 7 fills this for real)
 
     def ensure_profile(self, user_id, email):
         self.profiles.setdefault(
@@ -37,6 +45,10 @@ class FakeRepo:
             "created_at": now_iso(),
             "submitted_at": None,
             "trust_score": None,
+            # migration 005 defaults, so the fake matches the real table
+            "crowd_verified": False,
+            "crew_id": None,
+            "site_id": None,
         }
         self.observations[oid] = obs
         return dict(obs)
@@ -61,6 +73,9 @@ class FakeRepo:
         key = (row["observation_id"], row["indicator_id"])
         existing = self.answers.get(key, {})
         existing.update(row)
+        existing.setdefault("id", str(uuid.uuid4()))  # the real table generates one
+        existing.setdefault("crowd_votes", 0)
+        existing.setdefault("crowd_status", "pending")
         self.answers[key] = existing
         return dict(existing)
 
@@ -178,6 +193,159 @@ class FakeRepo:
 
     def list_all_answers(self):
         return [dict(a) for a in self.answers.values()]
+
+    def list_all_observations(self):
+        return [dict(o) for o in self.observations.values()]
+
+    # ---------------- Guardians (Phase 1) ----------------
+
+    def add_gold_item(self, **fields):
+        """Test helper: seed a gold item and get its row back."""
+        row = {"id": str(uuid.uuid4()), "source": "seed", "active": True, **fields}
+        self.gold_items[row["id"]] = row
+        return dict(row)
+
+    def list_gold_items(self, active_only=True):
+        return [dict(g) for g in self.gold_items.values() if g.get("active", True) or not active_only]
+
+    def get_gold_item(self, gold_id):
+        g = self.gold_items.get(gold_id)
+        return dict(g) if g else None
+
+    def insert_gold_item(self, row):
+        row = {"id": str(uuid.uuid4()), "created_at": now_iso(), **row}
+        self.gold_items[row["id"]] = row
+        return dict(row)
+
+    def insert_vote(self, row):
+        row = {"id": str(uuid.uuid4()), "created_at": now_iso(), **row}
+        self.votes[row["id"]] = row
+        if row.get("answer_id"):
+            for answer in self.answers.values():
+                if answer.get("id") == row["answer_id"]:
+                    answer["crowd_votes"] = (answer.get("crowd_votes") or 0) + 1
+        return dict(row)
+
+    def get_vote(self, voter_id, answer_id=None, gold_item_id=None):
+        for v in self.votes.values():
+            if v["voter_id"] != voter_id:
+                continue
+            if answer_id and v.get("answer_id") == answer_id:
+                return dict(v)
+            if gold_item_id and v.get("gold_item_id") == gold_item_id:
+                return dict(v)
+        return None
+
+    def update_vote(self, vote_id, fields):
+        self.votes[vote_id].update(fields)
+        return dict(self.votes[vote_id])
+
+    def list_votes_for_answer(self, answer_id):
+        return [dict(v) for v in self.votes.values() if v.get("answer_id") == answer_id]
+
+    def list_votes_by_voter(self, voter_id):
+        return [dict(v) for v in self.votes.values() if v["voter_id"] == voter_id]
+
+    def list_gold_votes(self, voter_id):
+        out = []
+        for v in self.votes.values():
+            if v["voter_id"] != voter_id or not v.get("is_gold"):
+                continue
+            gold = self.gold_items.get(v.get("gold_item_id")) or {}
+            out.append({**v, "expert_score": gold.get("expert_score")})
+        return out
+
+    def count_votes(self, voter_id, is_gold=None):
+        return sum(
+            1
+            for v in self.votes.values()
+            if v["voter_id"] == voter_id and (is_gold is None or bool(v.get("is_gold")) == is_gold)
+        )
+
+    def list_vote_candidates(self, exclude_user_id, limit=50):
+        out = []
+        for a in self.answers.values():
+            obs = self.observations.get(a["observation_id"]) or {}
+            if obs.get("status") != "submitted" or obs.get("user_id") == exclude_user_id:
+                continue
+            if not a.get("photo_path") or a.get("crowd_status", "pending") != "pending":
+                continue
+            out.append({**a, "user_id": obs.get("user_id"), "crew_id": obs.get("crew_id")})
+        out.sort(key=lambda a: a.get("crowd_votes") or 0)
+        return [dict(a) for a in out[:limit]]
+
+    def get_answer_by_id(self, answer_id):
+        return next((dict(a) for a in self.answers.values() if a.get("id") == answer_id), None)
+
+    def insert_points(self, rows):
+        inserted = []
+        for row in rows:
+            key = (row["user_id"], row["reason"], row["ref_id"])
+            if any((p["user_id"], p["reason"], p["ref_id"]) == key for p in self.points):
+                continue  # unique (user_id, reason, ref_id): idempotent awarding
+            saved = {"id": str(uuid.uuid4()), "created_at": now_iso(), "settled_at": None, **row}
+            self.points.append(saved)
+            inserted.append(dict(saved))
+        return inserted
+
+    def list_points(self, user_id, status=None):
+        return [dict(p) for p in self.points if p["user_id"] == user_id and (status is None or p["status"] == status)]
+
+    def settle_points(self, updates):
+        changed = 0
+        for u in updates:
+            for p in self.points:
+                same = (p["user_id"], p["reason"], p["ref_id"]) == (u["user_id"], u["reason"], u["ref_id"])
+                if same and p["status"] == "pending":
+                    p["status"] = u["status"]
+                    p["settled_at"] = u["settled_at"]
+                    changed += 1
+        return changed
+
+    def insert_receipt(self, row):
+        row = {"id": str(uuid.uuid4()), "seen": False, "created_at": now_iso(), **row}
+        self.receipts[row["id"]] = row
+        return dict(row)
+
+    def list_receipts(self, user_id, unseen_only=False, limit=20):
+        rows = [r for r in self.receipts.values() if r["user_id"] == user_id]
+        if unseen_only:
+            rows = [r for r in rows if not r["seen"]]
+        rows.sort(key=lambda r: r["created_at"], reverse=True)
+        return [dict(r) for r in rows[:limit]]
+
+    def get_receipt(self, receipt_id):
+        r = self.receipts.get(receipt_id)
+        return dict(r) if r else None
+
+    def mark_receipt_seen(self, receipt_id):
+        self.receipts[receipt_id]["seen"] = True
+        return dict(self.receipts[receipt_id])
+
+    def list_user_badges(self, user_id):
+        return [dict(b) for b in self.user_badges if b["user_id"] == user_id]
+
+    def insert_user_badge(self, user_id, badge_id):
+        if any(b["user_id"] == user_id and b["badge_id"] == badge_id for b in self.user_badges):
+            return None
+        row = {"user_id": user_id, "badge_id": badge_id, "unlocked_at": now_iso()}
+        self.user_badges.append(row)
+        return dict(row)
+
+    def create_site(self, lat, lng, name):
+        row = {"id": str(uuid.uuid4()), "lat": lat, "lng": lng, "name": name, "created_at": now_iso()}
+        self.sites[row["id"]] = row
+        return dict(row)
+
+    def get_site(self, site_id):
+        s = self.sites.get(site_id)
+        return dict(s) if s else None
+
+    def list_sites(self):
+        return [dict(s) for s in self.sites.values()]
+
+    def crew_id_for_user(self, user_id):
+        return self.crews.get(user_id)
 
 
 class FakeStorage:

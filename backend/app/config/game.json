@@ -1,0 +1,50 @@
+{
+  "round_size": 5,
+  "gold_every": 4,
+  "onboarding_gold_count": 4,
+  "new_player_gold_only_until": 4,
+  "voter_min_gold_votes": 4,
+  "voter_min_gold_accuracy": 0.5,
+  "agree_max_diff": 1,
+  "disagree_min_diff": 2,
+  "points": {
+    "stream_check_per_indicator": 10,
+    "gold_match": 5,
+    "vote_matches_consensus": 3,
+    "adopted_site_monthly_bonus": 20
+  },
+  "max_adopted_sites": 3,
+  "adopted_check_interval_days": 30,
+  "vote_rate_limit_per_minute": 60,
+  "consensus": {
+    "min_votes": 3,
+    "min_total_weight": 2.0
+  },
+  "skill_weight": {
+    "neutral": 1.0,
+    "min": 0.4,
+    "max": 2.0,
+    "neutral_accuracy": 0.5,
+    "prior_strength": 4,
+    "fallback_to_global": true
+  },
+  "skill_map": {
+    "min_votes": 3,
+    "strong_accuracy": 0.8,
+    "weak_accuracy": 0.6
+  },
+  "anti_cheat": {
+    "exclude_own_crew": true,
+    "gold_blind": true
+  },
+  "blind_spot": {
+    "min_votes": 3,
+    "min_abs_error": 0.75
+  },
+  "levels": [
+    {"id": "beginner", "label": "Beginner", "min_gold_votes": 0, "min_gold_accuracy": 0, "min_verified_checks": 0},
+    {"id": "sharp_eye", "label": "Sharp Eye", "min_gold_votes": 10, "min_gold_accuracy": 0.6, "min_verified_checks": 0},
+    {"id": "calibrated", "label": "Calibrated Observer", "min_gold_votes": 20, "min_gold_accuracy": 0.7, "min_verified_checks": 3},
+    {"id": "guardian", "label": "Stream Guardian", "min_gold_votes": 30, "min_gold_accuracy": 0.75, "min_verified_checks": 10}
+  ]
+}

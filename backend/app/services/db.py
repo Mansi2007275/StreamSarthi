@@ -45,6 +45,33 @@ class RepoProtocol(Protocol):
     def mark_lesson_seen(self, lesson_id: str) -> dict: ...
     def list_map_observations(self, statuses: list[str]) -> list[dict]: ...
     def list_all_answers(self) -> list[dict]: ...
+    def list_all_observations(self) -> list[dict]: ...
+    # ----- Guardians (Phase 1) -----
+    def list_gold_items(self, active_only: bool = True) -> list[dict]: ...
+    def get_gold_item(self, gold_id: str) -> dict | None: ...
+    def insert_gold_item(self, row: dict[str, Any]) -> dict: ...
+    def insert_vote(self, row: dict[str, Any]) -> dict: ...
+    def get_vote(self, voter_id: str, answer_id: str | None, gold_item_id: str | None) -> dict | None: ...
+    def update_vote(self, vote_id: str, fields: dict[str, Any]) -> dict: ...
+    def list_votes_for_answer(self, answer_id: str) -> list[dict]: ...
+    def list_votes_by_voter(self, voter_id: str) -> list[dict]: ...
+    def list_gold_votes(self, voter_id: str) -> list[dict]: ...
+    def count_votes(self, voter_id: str, is_gold: bool | None = None) -> int: ...
+    def list_vote_candidates(self, exclude_user_id: str, limit: int = 50) -> list[dict]: ...
+    def get_answer_by_id(self, answer_id: str) -> dict | None: ...
+    def insert_points(self, rows: list[dict[str, Any]]) -> list[dict]: ...
+    def list_points(self, user_id: str, status: str | None = None) -> list[dict]: ...
+    def settle_points(self, updates: list[dict[str, Any]]) -> int: ...
+    def insert_receipt(self, row: dict[str, Any]) -> dict: ...
+    def list_receipts(self, user_id: str, unseen_only: bool = False, limit: int = 20) -> list[dict]: ...
+    def get_receipt(self, receipt_id: str) -> dict | None: ...
+    def mark_receipt_seen(self, receipt_id: str) -> dict: ...
+    def list_user_badges(self, user_id: str) -> list[dict]: ...
+    def insert_user_badge(self, user_id: str, badge_id: str) -> dict | None: ...
+    def create_site(self, lat: float, lng: float, name: str | None) -> dict: ...
+    def get_site(self, site_id: str) -> dict | None: ...
+    def list_sites(self) -> list[dict]: ...
+    def crew_id_for_user(self, user_id: str) -> str | None: ...
 
 
 def now_iso() -> str:
@@ -228,10 +255,180 @@ class SupabaseRepo:
     def list_all_answers(self):
         res = (
             self.db.table("indicator_answers")
-            .select("indicator_id, human_score, ai_score, ai_confidence, expert_score")
+            .select(
+                "indicator_id, human_score, ai_score, ai_confidence, expert_score, "
+                "used_ai_answer, crowd_score, crowd_votes, crowd_status"
+            )
             .execute()
         )
         return res.data or []
+
+    def list_all_observations(self):
+        res = self.db.table("observations").select("id, status, crowd_verified, reviewed_at, submitted_at").execute()
+        return res.data or []
+
+    # ---------------- Guardians (Phase 1) ----------------
+
+    def list_gold_items(self, active_only=True):
+        q = self.db.table("gold_items").select("*")
+        if active_only:
+            q = q.eq("active", True)
+        return q.execute().data or []
+
+    def get_gold_item(self, gold_id):
+        res = self.db.table("gold_items").select("*").eq("id", gold_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def insert_gold_item(self, row):
+        return self.db.table("gold_items").insert(row).execute().data[0]
+
+    def insert_vote(self, row):
+        return self.db.table("validation_votes").insert(row).execute().data[0]
+
+    def get_vote(self, voter_id, answer_id=None, gold_item_id=None):
+        q = self.db.table("validation_votes").select("*").eq("voter_id", voter_id)
+        q = q.eq("answer_id", answer_id) if answer_id else q.eq("gold_item_id", gold_item_id)
+        res = q.limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def update_vote(self, vote_id, fields):
+        return self.db.table("validation_votes").update(fields).eq("id", vote_id).execute().data[0]
+
+    def list_votes_for_answer(self, answer_id):
+        res = self.db.table("validation_votes").select("*").eq("answer_id", answer_id).execute()
+        return res.data or []
+
+    def list_votes_by_voter(self, voter_id):
+        """Everything this player has already judged, so a round never offers it twice."""
+        res = (
+            self.db.table("validation_votes")
+            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct")
+            .eq("voter_id", voter_id)
+            .execute()
+        )
+        return res.data or []
+
+    def list_gold_votes(self, voter_id):
+        """Gold votes with the expert score joined in: that pair is what skill is measured from."""
+        res = (
+            self.db.table("validation_votes")
+            .select("id, indicator_id, score, correct, created_at, gold_items!inner(expert_score)")
+            .eq("voter_id", voter_id)
+            .eq("is_gold", True)
+            .execute()
+        )
+        return [{**r, "expert_score": (r.pop("gold_items") or {}).get("expert_score")} for r in (res.data or [])]
+
+    def count_votes(self, voter_id, is_gold=None):
+        q = self.db.table("validation_votes").select("id", count="exact").eq("voter_id", voter_id)
+        if is_gold is not None:
+            q = q.eq("is_gold", is_gold)
+        return q.execute().count or 0
+
+    def list_vote_candidates(self, exclude_user_id, limit=50):
+        """Answers in the crowd pool: submitted, photographed, consensus not settled yet.
+
+        Excludes the caller in SQL as well as in services/game.py - the cheapest place to
+        stop somebody voting on their own photo is before it ever leaves the database.
+        """
+        res = (
+            self.db.table("indicator_answers")
+            .select(
+                "id, indicator_id, photo_path, crowd_votes, crowd_status, created_at, "
+                "observations!inner(user_id, crew_id, status)"
+            )
+            .eq("observations.status", "submitted")
+            .neq("observations.user_id", exclude_user_id)
+            .eq("crowd_status", "pending")
+            .not_.is_("photo_path", "null")
+            .order("crowd_votes")
+            .limit(limit)
+            .execute()
+        )
+        out = []
+        for r in res.data or []:
+            obs = r.pop("observations") or {}
+            out.append({**r, "user_id": obs.get("user_id"), "crew_id": obs.get("crew_id")})
+        return out
+
+    def get_answer_by_id(self, answer_id):
+        res = self.db.table("indicator_answers").select("*").eq("id", answer_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def insert_points(self, rows):
+        if not rows:
+            return []
+        # The (user_id, reason, ref_id) unique key makes a retry a no-op instead of a double payout.
+        res = (
+            self.db.table("points_ledger")
+            .upsert(rows, on_conflict="user_id,reason,ref_id", ignore_duplicates=True)
+            .execute()
+        )
+        return res.data or []
+
+    def list_points(self, user_id, status=None):
+        q = self.db.table("points_ledger").select("*").eq("user_id", user_id)
+        if status:
+            q = q.eq("status", status)
+        return q.execute().data or []
+
+    def settle_points(self, updates):
+        """Each update is {user_id, reason, ref_id, status, settled_at}; only pending rows move."""
+        changed = 0
+        for u in updates:
+            res = (
+                self.db.table("points_ledger")
+                .update({"status": u["status"], "settled_at": u["settled_at"]})
+                .eq("user_id", u["user_id"])
+                .eq("reason", u["reason"])
+                .eq("ref_id", u["ref_id"])
+                .eq("status", "pending")
+                .execute()
+            )
+            changed += len(res.data or [])
+        return changed
+
+    def insert_receipt(self, row):
+        return self.db.table("receipts").insert(row).execute().data[0]
+
+    def list_receipts(self, user_id, unseen_only=False, limit=20):
+        q = self.db.table("receipts").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit)
+        if unseen_only:
+            q = q.eq("seen", False)
+        return q.execute().data or []
+
+    def get_receipt(self, receipt_id):
+        res = self.db.table("receipts").select("*").eq("id", receipt_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def mark_receipt_seen(self, receipt_id):
+        return self.db.table("receipts").update({"seen": True}).eq("id", receipt_id).execute().data[0]
+
+    def list_user_badges(self, user_id):
+        return self.db.table("user_badges").select("*").eq("user_id", user_id).execute().data or []
+
+    def insert_user_badge(self, user_id, badge_id):
+        res = (
+            self.db.table("user_badges")
+            .upsert({"user_id": user_id, "badge_id": badge_id}, on_conflict="user_id,badge_id", ignore_duplicates=True)
+            .execute()
+        )
+        return (res.data or [None])[0]
+
+    def create_site(self, lat, lng, name):
+        return self.db.table("sites").insert({"lat": lat, "lng": lng, "name": name}).execute().data[0]
+
+    def get_site(self, site_id):
+        res = self.db.table("sites").select("*").eq("id", site_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def list_sites(self):
+        return self.db.table("sites").select("*").execute().data or []
+
+    def crew_id_for_user(self, user_id):
+        """Crews land in Phase 7. Until then nobody has one, so the crew anti-cheat rule
+        is live and tested but has nothing to exclude on."""
+        return None
 
 
 @lru_cache

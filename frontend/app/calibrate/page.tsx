@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
-import ScalePicker from "@/components/ScalePicker";
+import PhotoQuestion from "@/components/PhotoQuestion";
 import { api, friendlyMessage } from "@/lib/api";
 import type { CalibrationAnswerResult, CalibrationItem, Indicator } from "@/lib/types";
 
@@ -54,6 +54,8 @@ function Calibrate() {
   const ind = indicators.find((i) => i.id === item.indicator_id);
   const isLast = index === items.length - 1;
 
+  if (!ind) return <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Unknown indicator {item.indicator_id}</p>;
+
   async function check() {
     if (score === null) return;
     setBusy(true);
@@ -88,22 +90,18 @@ function Calibrate() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-xs text-muted">
-          Practice {index + 1} of {items.length}
-        </p>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
-          <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${((index + 1) / items.length) * 100}%` }} />
-        </div>
-      </div>
-
-      <h1 className="text-xl font-semibold">{ind?.label ?? item.indicator_id}</h1>
-      <p className="text-muted">Score this photo the way you would for a real assessment.</p>
-
-      {/* eslint-disable-next-line @next/next/no-img-element -- local static placeholder, not a remote/signed URL */}
-      <img src={item.image} alt="Practice stream photo" className="w-full rounded-2xl border border-line object-cover" />
-
-      {ind && <ScalePicker scale={ind.scale} labels={ind.scale_labels} value={score} disabled={!!result || busy} onChange={setScore} />}
+      <PhotoQuestion
+        label={ind.label}
+        help="Score this photo the way you would for a real assessment."
+        imageUrl={item.image}
+        scale={ind.scale}
+        scaleLabels={ind.scale_labels}
+        score={score}
+        onScore={setScore}
+        disabled={!!result || busy}
+        step={index + 1}
+        total={items.length}
+      />
 
       {!result && (
         <button

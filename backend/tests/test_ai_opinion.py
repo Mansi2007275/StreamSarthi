@@ -3,7 +3,7 @@ import pytest
 from app.services.ai_opinion import build_prompt, parse_opinion
 from app.services.indicators import get_indicator
 
-IND = get_indicator("water_appearance")
+IND = get_indicator("water_colour")
 
 
 def test_parses_json_inside_markdown_fences():
@@ -43,7 +43,9 @@ def test_garbage_raises():
 
 def test_prompt_contains_scale_labels():
     p = build_prompt(IND)
-    assert "1=Very clear" in p and "5=Very murky" in p
+    # Derived from config, so relabelling an indicator cannot silently break the prompt.
+    for i, label in enumerate(IND.scale_labels, start=IND.scale[0]):
+        assert f"{i}={label}" in p
 
 
 @pytest.mark.anyio
