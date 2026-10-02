@@ -41,18 +41,32 @@ class AIOpinion(BaseModel):
 class ObservationCreate(BaseModel):
     lat: float | None = Field(default=None, ge=-90, le=90)
     lng: float | None = Field(default=None, ge=-180, le=180)
+    # Site step: the citizen either confirmed a nearby site (site_id) or called it a new
+    # place and may have named it. Neither given -> a site is created unnamed on submit.
+    site_id: str | None = None
+    site_name: str | None = Field(default=None, max_length=80)
 
 
 class ObservationCreated(BaseModel):
     id: str
     status: str
+    site_id: str | None = None
+    site_name: str | None = None
+
+
+Confidence = Literal["sure", "somewhat", "guess"]
 
 
 class AnswerChoice(BaseModel):
-    """PATCH body: user either takes the AI answer, or keeps (and may change) their own."""
+    """PATCH body: user either takes the AI answer, or keeps (and may change) their own.
+
+    `human_confidence` lets the Disagreement Card's "Not sure - ask an expert" button mark
+    the answer a guess without discarding the score the citizen gave.
+    """
 
     used_ai_answer: bool
     human_score: int | None = None
+    human_confidence: Confidence | None = None
 
 
 class AnswerOut(BaseModel):
@@ -68,6 +82,10 @@ class AnswerOut(BaseModel):
     photo_quality: dict | None = None
     flags: list[str] = []
     expert_score: int | None = None
+    human_confidence: Confidence | None = None
+    crowd_score: float | None = None
+    crowd_votes: int = 0
+    crowd_status: str | None = None
 
 
 class IndicatorResult(BaseModel):
@@ -83,6 +101,10 @@ class IndicatorResult(BaseModel):
     retake_tip: str
     photo_quality: dict | None = None
     flags: list[str] = []
+    human_confidence: Confidence | None = None
+    # True -> the client shows the Disagreement Card instead of the plain AI card. Computed
+    # server-side so the threshold lives in game.json, not in two codebases.
+    disagreement: bool = False
 
 
 class ObservationOut(BaseModel):
@@ -356,3 +378,27 @@ class ProofOut(BaseModel):
     per_indicator: list[ProofIndicatorOut]
     share_needed_expert: float | None
     counts: ProofCountsOut
+
+
+# ---------- Phase 3: submit result ----------
+class SubmitResult(ObservationOut):
+    """What the success screen needs: the points now riding on a verification, and who got
+    the observation next."""
+
+    pending_points: int = 0
+    routed_to: Literal["crowd", "expert"] = "crowd"
+    routing_reasons: list[str] = []
+
+
+# ---------- Phase 3: sites ----------
+class SiteOut(BaseModel):
+    id: str
+    name: str | None = None
+
+
+class NearestSiteOut(BaseModel):
+    """`site` is null when there is nothing close enough: the client then offers "New place"."""
+
+    site: SiteOut | None = None
+    distance_m: float | None = None
+    radius_m: int

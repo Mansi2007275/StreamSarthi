@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import add_request_logging, setup_logging
-from app.routers import calibration, insights, lessons, me, observations, play, review
+from app.routers import calibration, insights, lessons, me, observations, play, review, sites
 from app.routers import map as map_router
 
 setup_logging()
@@ -34,6 +34,7 @@ app.include_router(map_router.router)
 app.include_router(calibration.router)
 app.include_router(insights.router)
 app.include_router(play.router)
+app.include_router(sites.router)
 
 
 @app.get("/", include_in_schema=False)

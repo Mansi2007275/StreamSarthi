@@ -41,6 +41,10 @@ export type IndicatorResult = {
   retake_tip: string;
   photo_quality: PhotoQuality | null;
   flags: string[];
+  human_confidence: Confidence | null;
+  /** True -> show the DisagreementCard instead of the plain AI card. Decided server-side
+   *  so the threshold lives in game.json rather than in two codebases. */
+  disagreement: boolean;
 };
 
 export type Answer = {
@@ -56,6 +60,10 @@ export type Answer = {
   photo_quality: PhotoQuality | null;
   flags: string[];
   expert_score: number | null;
+  human_confidence: Confidence | null;
+  crowd_score: number | null;
+  crowd_votes: number;
+  crowd_status: string | null;
 };
 
 export type TrustIssue = {
@@ -327,4 +335,29 @@ export type Proof = {
     crowd_verified: number;
     expert_scored_answers: number;
   };
+};
+
+// ---------- Phase 3: Stream Check upgrades ----------
+export type Site = {
+  id: string;
+  name: string | null;
+};
+
+export type NearestSite = {
+  site: Site | null;
+  distance_m: number | null;
+  radius_m: number;
+};
+
+export type ObservationCreated = {
+  id: string;
+  status: string;
+  site_id: string | null;
+  site_name: string | null;
+};
+
+export type SubmitResult = Observation & {
+  pending_points: number;
+  routed_to: "crowd" | "expert";
+  routing_reasons: string[];
 };

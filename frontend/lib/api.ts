@@ -13,7 +13,9 @@ import type {
   LessonsPage,
   MapResponse,
   Me,
+  NearestSite,
   Observation,
+  ObservationCreated,
   ObservationPage,
   OnboardingResult,
   PlayRound,
@@ -21,6 +23,7 @@ import type {
   ReviewActionBody,
   ReviewDetail,
   ReviewQueuePage,
+  SubmitResult,
   VoteResult,
 } from "./types";
 
@@ -84,23 +87,44 @@ async function request<T>(path: string, opts: Options = {}): Promise<T> {
 export const api = {
   health: () => request<{ status: string }>("/api/v1/health"),
   indicators: () => request<Indicator[]>("/api/v1/indicators"),
-  createObservation: (lat: number | null, lng: number | null) =>
-    request<{ id: string; status: string }>("/api/v1/observations", { method: "POST", json: { lat, lng } }),
-  answerIndicator: (obsId: string, indicatorId: string, humanScore: number | null, photo: Blob | null) => {
+  createObservation: (
+    lat: number | null,
+    lng: number | null,
+    site: { siteId?: string | null; siteName?: string | null } = {},
+  ) =>
+    request<ObservationCreated>("/api/v1/observations", {
+      method: "POST",
+      json: { lat, lng, site_id: site.siteId ?? null, site_name: site.siteName ?? null },
+    }),
+  sitesNear: (lat: number, lng: number) => request<NearestSite>(`/api/v1/sites/near?lat=${lat}&lng=${lng}`),
+  answerIndicator: (
+    obsId: string,
+    indicatorId: string,
+    humanScore: number | null,
+    photo: Blob | null,
+    confidence: Confidence | null = null,
+  ) => {
     const form = new FormData();
     if (humanScore !== null) form.append("human_score", String(humanScore));
+    if (confidence) form.append("human_confidence", confidence);
     if (photo) form.append("photo", photo, `${indicatorId}.jpg`);
     return request<IndicatorResult>(`/api/v1/observations/${obsId}/indicators/${indicatorId}`, {
       method: "POST",
       form,
     });
   },
-  chooseAnswer: (obsId: string, indicatorId: string, usedAi: boolean, humanScore?: number | null) =>
+  chooseAnswer: (
+    obsId: string,
+    indicatorId: string,
+    usedAi: boolean,
+    humanScore?: number | null,
+    confidence?: Confidence | null,
+  ) =>
     request<Answer>(`/api/v1/observations/${obsId}/indicators/${indicatorId}`, {
       method: "PATCH",
-      json: { used_ai_answer: usedAi, human_score: humanScore ?? null },
+      json: { used_ai_answer: usedAi, human_score: humanScore ?? null, human_confidence: confidence ?? null },
     }),
-  submit: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}/submit`, { method: "POST" }),
+  submit: (obsId: string) => request<SubmitResult>(`/api/v1/observations/${obsId}/submit`, { method: "POST" }),
   mine: (offset = 0, limit = 20) => request<ObservationPage>(`/api/v1/observations/mine?offset=${offset}&limit=${limit}`),
   observation: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}`),
   observationAudit: (obsId: string) => request<AuditResponse>(`/api/v1/observations/${obsId}/audit`),

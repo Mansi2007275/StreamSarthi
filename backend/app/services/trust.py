@@ -8,6 +8,11 @@ from app.services.scoring import final_score
 
 WEIGHTS = {"A": 0.30, "Q": 0.20, "C": 0.15, "L": 0.15, "O": 0.20}
 REVIEW_THRESHOLD = 60
+
+# Issues that send an observation to an expert whatever the trust score says. A high score
+# cannot talk us out of a confident AI contradiction, or out of a citizen who told us
+# plainly that they were guessing.
+FORCE_REVIEW_CODES = ("strong_disagreement", "citizen_unsure")
 MIN_USABLE_CONFIDENCE = 0.3
 ACCURACY_OLD_WEIGHT = 0.8
 ACCURACY_NEW_WEIGHT = 0.2
@@ -68,7 +73,7 @@ def compute_trust(
         "O": _observer(observer_accuracy),
     }
     score = 100 * sum(WEIGHTS[k] * v for k, v in components.items())
-    needs_review = score < REVIEW_THRESHOLD or any(i["code"] == "strong_disagreement" for i in issues)
+    needs_review = score < REVIEW_THRESHOLD or any(i["code"] in FORCE_REVIEW_CODES for i in issues)
     return {
         "score": round(score, 1),
         "components": {k: round(v, 3) for k, v in components.items()},
