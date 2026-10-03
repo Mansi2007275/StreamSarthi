@@ -12,6 +12,7 @@ import type {
   Lesson,
   LessonsPage,
   MapResponse,
+  MadeGold,
   Me,
   NearestSite,
   Observation,
@@ -23,6 +24,7 @@ import type {
   ReviewActionBody,
   ReviewDetail,
   ReviewQueuePage,
+  ReviewStats,
   SubmitResult,
   VoteResult,
 } from "./types";
@@ -134,6 +136,12 @@ export const api = {
   reviewDetail: (obsId: string) => request<ReviewDetail>(`/api/v1/review/${obsId}`),
   reviewAction: (obsId: string, body: ReviewActionBody) =>
     request<ReviewDetail>(`/api/v1/review/${obsId}`, { method: "POST", json: body }),
+  reviewStats: () => request<ReviewStats>("/api/v1/review/stats"),
+  makeGold: (obsId: string, indicatorId: string, explanation: string) =>
+    request<MadeGold>(`/api/v1/review/${obsId}/gold`, {
+      method: "POST",
+      json: { indicator_id: indicatorId, explanation },
+    }),
   lessons: (unseen = false, limit = 5) => request<LessonsPage>(`/api/v1/lessons?unseen=${unseen}&limit=${limit}`),
   markLessonSeen: (lessonId: string) => request<Lesson>(`/api/v1/lessons/${lessonId}/seen`, { method: "POST" }),
   map: (params: { minTrust?: number; status?: string[]; bbox?: string; limit?: number } = {}) => {

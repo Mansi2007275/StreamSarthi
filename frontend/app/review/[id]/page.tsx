@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import AuditTimeline from "@/components/AuditTimeline";
+import CrowdPanel from "@/components/CrowdPanel";
 import ExpertGate from "@/components/ExpertGate";
 import OneHealthCard from "@/components/OneHealthCard";
 import ScalePicker from "@/components/ScalePicker";
@@ -12,6 +13,19 @@ import TrustCard from "@/components/TrustCard";
 import { useToast } from "@/components/Toast";
 import { api, friendlyMessage } from "@/lib/api";
 import type { AuditResponse, Indicator, ReviewDetail } from "@/lib/types";
+
+const REASON_LABEL: Record<string, string> = {
+  citizen_unsure: "Citizen was unsure",
+  strong_disagreement: "Citizen vs AI",
+  crowd_disagrees: "Crowd disagrees",
+  crowd_inconclusive: "Crowd split",
+  gps_missing: "No GPS",
+};
+
+function reasonLabel(code: string): string {
+  const base = code.split(":")[0];
+  return REASON_LABEL[base] ?? base.replace(/_/g, " ");
+}
 
 function Detail() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +40,9 @@ function Detail() {
   const [note, setNote] = useState("");
   const [confirmingReject, setConfirmingReject] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [goldFor, setGoldFor] = useState<string | null>(null);
+  const [goldWhy, setGoldWhy] = useState("");
+  const [gilded, setGilded] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([api.reviewDetail(id), api.indicators(), api.observationAudit(id)])
@@ -65,6 +82,25 @@ function Detail() {
   const hasChanges = Object.keys(corrections).length > 0;
   const noteValid = note.trim().length >= 5;
 
+  const crowdFor = (indicatorId: string) => obs?.crowd.find((c) => c.indicator_id === indicatorId) ?? null;
+  // Only a reviewed answer has a known expert score, which is the whole point of a
+  // practice photo - so the button appears after the decision, not before it.
+  const canPromote = ["verified", "corrected"].includes(obs.status);
+
+  async function promote(indicatorId: string) {
+    setBusy(true);
+    try {
+      await api.makeGold(id, indicatorId, goldWhy.trim());
+      setGilded((g) => [...g, indicatorId]);
+      setGoldFor(null);
+      toast("success", "Added to the practice set.");
+    } catch (e) {
+      toast("error", friendlyMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function act(action: "approve" | "correct" | "reject") {
     if (!noteValid) {
       toast("info", "Please add a note (at least 5 characters).");
@@ -78,8 +114,11 @@ function Detail() {
         note,
       });
       if (!result.audit_ok) toast("info", "Saved, but the audit log could not be written this time.");
-      toast("success", "Review saved.");
-      router.push("/review");
+      setObs(result);
+      setBusy(false);
+      setConfirmingReject(false);
+      toast("success", action === "reject" ? "Review saved." : "Review saved. You can now add practice photos.");
+      if (action === "reject") router.push("/review");
     } catch (e) {
       toast("error", friendlyMessage(e));
       setBusy(false);
@@ -94,6 +133,16 @@ function Detail() {
         <p className="mt-1 text-sm text-muted">
           Track record: {obs.citizen_observer_accuracy !== null ? `${Math.round(obs.citizen_observer_accuracy * 100)}%` : "-"}
         </p>
+        {obs.routing_reasons.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="text-xs text-muted">Why you have this:</span>
+            {Array.from(new Set(obs.routing_reasons)).map((code) => (
+              <span key={code} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                {reasonLabel(code)}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <TrustCard trust={obs.trust_breakdown} />
@@ -134,6 +183,59 @@ function Detail() {
                   ))}
                 </div>
               )}
+              {crowdFor(a.indicator_id) && (
+                <CrowdPanel panel={crowdFor(a.indicator_id)!} citizenScore={a.final_score} />
+              )}
+
+              {canPromote && (
+                goldFor === a.indicator_id ? (
+                  <div className="rounded-xl border border-brand-200 bg-brand-50 p-3">
+                    <label className="block text-sm font-medium">
+                      Why is this a good example?
+                      <textarea
+                        value={goldWhy}
+                        onChange={(e) => setGoldWhy(e.target.value)}
+                        rows={3}
+                        maxLength={400}
+                        placeholder="Players see this after they answer, so explain what the photo shows."
+                        className="mt-1 w-full rounded-xl border border-line p-2 text-sm"
+                      />
+                    </label>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => promote(a.indicator_id)}
+                        disabled={busy || goldWhy.trim().length < 10}
+                        className="min-h-11 rounded-xl bg-brand-600 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save as practice photo
+                      </button>
+                      <button
+                        onClick={() => setGoldFor(null)}
+                        disabled={busy}
+                        className="min-h-11 rounded-xl border border-line bg-white text-sm font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : gilded.includes(a.indicator_id) ? (
+                  <p className="rounded-xl bg-brand-50 p-2 text-xs font-medium text-brand-700">
+                    Added to the practice set.
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setGoldFor(a.indicator_id);
+                      setGoldWhy("");
+                    }}
+                    disabled={busy}
+                    className="min-h-11 w-full rounded-xl border border-line bg-white text-sm font-medium"
+                  >
+                    Make this a practice photo
+                  </button>
+                )
+              )}
+
               {ind && (
                 <div>
                   <p className="mb-2 text-sm font-medium">Expert score</p>

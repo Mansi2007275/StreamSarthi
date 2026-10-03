@@ -157,6 +157,8 @@ export type ReviewDetail = Observation & {
   citizen_display_name: string | null;
   citizen_observer_accuracy: number | null;
   audit_ok: boolean;
+  crowd: CrowdPanel[];
+  routing_reasons: string[];
 };
 
 export type ReviewActionBody = {
@@ -360,4 +362,35 @@ export type SubmitResult = Observation & {
   pending_points: number;
   routed_to: "crowd" | "expert";
   routing_reasons: string[];
+};
+
+// ---------- Phase 4: expert upgrades ----------
+export type CrowdVoteBucket = {
+  score: number;
+  count: number;
+};
+
+export type CrowdPanel = {
+  indicator_id: string;
+  label: string;
+  crowd_score: number | null;
+  crowd_votes: number;
+  crowd_status: string | null;
+  histogram: CrowdVoteBucket[];
+  excluded_count: number;
+  human_confidence: Confidence | null;
+};
+
+export type ReviewStats = {
+  total_submitted: number;
+  needed_expert: number;
+  share_needed_expert: number | null;
+  crowd_verified: number;
+};
+
+export type MadeGold = {
+  id: string;
+  indicator_id: string;
+  expert_score: number;
+  explanation: string;
 };

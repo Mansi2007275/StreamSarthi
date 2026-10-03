@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import ExpertGate from "@/components/ExpertGate";
 import { api, friendlyMessage } from "@/lib/api";
-import type { ReviewQueueItem } from "@/lib/types";
+import type { ReviewQueueItem, ReviewStats } from "@/lib/types";
 
 const PAGE = 20;
 
@@ -22,9 +22,18 @@ function Queue() {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [stats, setStats] = useState<ReviewStats | null>(null);
 
   useEffect(() => {
     let active = true;
+    // The headline number is the cost argument for the whole design, so it loads
+    // independently: a failure here must not hide the queue.
+    api
+      .reviewStats()
+      .then((s) => {
+        if (active) setStats(s);
+      })
+      .catch(() => {});
     api
       .reviewQueue(status, 0, PAGE)
       .then((p) => {
@@ -64,6 +73,16 @@ function Queue() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Expert review</h1>
+
+      {stats && stats.share_needed_expert !== null && (
+        <section className="rounded-2xl bg-brand-600 p-4 text-white">
+          <p className="text-3xl font-bold">Only {Math.round(stats.share_needed_expert * 100)}% needed you</p>
+          <p className="mt-1 text-sm text-brand-50">
+            {stats.needed_expert} of {stats.total_submitted} submitted observations reached an expert.
+            {stats.crowd_verified > 0 && ` Guardians verified ${stats.crowd_verified} between them.`}
+          </p>
+        </section>
+      )}
 
       <div className="inline-flex rounded-xl border border-line bg-white p-1">
         {(["needs_review", "submitted"] as const).map((s) => (
