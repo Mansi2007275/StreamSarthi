@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { api, friendlyMessage } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { SubmitResult } from "@/lib/types";
 
 const REASON_TEXT: Record<string, string> = {
@@ -45,9 +45,9 @@ export default function SubmitSuccess({
     try {
       await api.adoptSite(siteId);
       setAdoptState("done");
-    } catch (e) {
+    } catch {
+      // The button turns into "Try again"; nothing else here needs to know.
       setAdoptState("failed");
-      console.warn(friendlyMessage(e));
     }
   }
 
