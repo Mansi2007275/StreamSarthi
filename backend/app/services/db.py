@@ -6,8 +6,8 @@ So routers must always check ownership themselves (see routers/observations.py).
 Tests replace Repo with an in-memory fake (tests/fakes.py), so no DB is needed for pytest.
 """
 
+import threading
 from datetime import datetime, timezone
-from functools import lru_cache
 from typing import Any, Protocol
 
 from supabase import Client, create_client
@@ -560,12 +560,25 @@ class SupabaseRepo:
         return res.data or []
 
 
-@lru_cache
+_local = threading.local()
+
+
 def get_supabase() -> Client:
-    s = get_settings()
-    if not s.supabase_url or not s.supabase_service_key:
-        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
-    return create_client(s.supabase_url, s.supabase_service_key)
+    """One Supabase client per worker thread.
+
+    FastAPI runs sync endpoints in a thread pool. A single shared client (its HTTP/2
+    connection) used from several threads at once fails intermittently with
+    `httpx.ReadError: [Errno 11] Resource temporarily unavailable`. A client per thread
+    avoids sharing the connection while still reusing it across requests on that thread.
+    """
+    client = getattr(_local, "client", None)
+    if client is None:
+        s = get_settings()
+        if not s.supabase_url or not s.supabase_service_key:
+            raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
+        client = create_client(s.supabase_url, s.supabase_service_key)
+        _local.client = client
+    return client
 
 
 def get_repo() -> RepoProtocol:
