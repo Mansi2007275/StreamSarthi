@@ -29,6 +29,15 @@
     "prior_strength": 4,
     "fallback_to_global": true
   },
+  "practice_replay": {
+    "round_size": 5,
+    "xp_per_attempt": 1,
+    "xp_per_match": 2
+  },
+  "stations": {
+    "public_rate_limit_per_minute": 60,
+    "headline_months": 2
+  },
   "skill_map": {
     "min_votes": 3,
     "strong_accuracy": 0.8,

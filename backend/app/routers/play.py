@@ -13,6 +13,7 @@ still saved and the player still gets a sensible response.
 """
 
 import logging
+import random
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, Request
@@ -27,6 +28,8 @@ from app.models.schemas import (
     PlayIndicatorOut,
     PlayItemOut,
     PlayRoundOut,
+    PracticeAttemptIn,
+    PracticeRevealOut,
     VoteAckOut,
     VoteIn,
 )
@@ -39,7 +42,7 @@ from app.services.consensus import (
     compute_consensus,
 )
 from app.services.db import RepoProtocol, get_repo, now_iso
-from app.services.game import GOLD, gold_accuracy, gold_match_count, pick_round, skill_weight
+from app.services.game import GOLD, gold_accuracy, gold_item, gold_match_count, pick_round, skill_weight
 from app.services.game_config import load_game_config
 from app.services.indicators import get_indicator, load_indicators
 from app.services.scoring import final_score
@@ -91,13 +94,16 @@ def _item_out(item: dict, storage: StorageProtocol) -> PlayItemOut | None:
 
 def _player_stats(repo: RepoProtocol, user_id: str) -> dict:
     gold_votes = repo.list_gold_votes(user_id)
+    # Both exclusion sets come from the same list of votes, so a round can never offer
+    # something the player has already judged - that is what produced 409s mid-round.
+    all_votes = repo.list_votes_by_voter(user_id)
     return {
         "user_id": user_id,
         "crew_id": repo.crew_id_for_user(user_id),
         "gold_votes": len(gold_votes),
         "gold_accuracy": gold_accuracy(gold_votes),
-        "voted_answer_ids": {v["answer_id"] for v in repo.list_votes_by_voter(user_id) if v.get("answer_id")},
-        "voted_gold_ids": {v["gold_item_id"] for v in gold_votes if v.get("gold_item_id")},
+        "voted_answer_ids": {v["answer_id"] for v in all_votes if v.get("answer_id")},
+        "voted_gold_ids": {v["gold_item_id"] for v in all_votes if v.get("gold_item_id")},
     }
 
 
@@ -133,6 +139,82 @@ def round_(
     items = pick_round(stats, candidates, repo.list_gold_items(), cfg)
     out = [i for i in (_item_out(item, storage) for item in items) if i]
     return PlayRoundOut(items=out, round_size=cfg["round_size"])
+
+
+# ---------------- practice replay ----------------
+#
+# A separate mode on purpose. Replaying a photo whose answer you have already been told
+# would be free voting power if it fed skill weights, so a replay writes only to
+# practice_attempts and pays only XP. Points stay first-vote-only.
+
+
+def _total_xp(repo: RepoProtocol, user_id: str) -> int:
+    return sum(int(a.get("xp") or 0) for a in repo.list_practice_attempts(user_id))
+
+
+@router.get("/practice", response_model=PlayRoundOut)
+def practice_round(
+    user: CurrentUser = Depends(_user),
+    repo: RepoProtocol = Depends(get_repo),
+    storage: StorageProtocol = Depends(get_storage),
+):
+    """Gold photos to replay - including ones already voted on, which is the point."""
+    cfg = load_game_config()
+    size = cfg["practice_replay"]["round_size"]
+    repo.ensure_profile(user.id, user.email)
+
+    pool = [g for g in repo.list_gold_items() if g.get("active", True)]
+    random.shuffle(pool)
+    items = [gold_item(g) for g in pool[:size]]
+    out = [i for i in (_item_out(item, storage) for item in items) if i]
+    return PlayRoundOut(items=out, round_size=size)
+
+
+@router.post("/practice", response_model=PracticeRevealOut)
+def practice_attempt(
+    body: PracticeAttemptIn,
+    user: CurrentUser = Depends(_user),
+    repo: RepoProtocol = Depends(get_repo),
+    limiter: RateLimiter = Depends(get_vote_limiter),
+):
+    limiter.check(user.id)
+    repo.ensure_profile(user.id, user.email)
+    cfg = load_game_config()
+
+    gold = repo.get_gold_item(body.gold_item_id)
+    if not gold or not gold.get("active", True):
+        raise not_found("Practice photo")
+    _check_score(body.score, gold["indicator_id"])
+
+    expert = gold["expert_score"]
+    matched = body.score == expert
+    replay = cfg["practice_replay"]
+    xp = replay["xp_per_match"] if matched else replay["xp_per_attempt"]
+
+    repo.insert_practice_attempt(
+        {
+            "user_id": user.id,
+            "gold_item_id": gold["id"],
+            "score": body.score,
+            "correct": matched,
+            "xp": xp,
+        }
+    )
+
+    ind = get_indicator(gold["indicator_id"])
+    labels = ind.scale_labels if ind else []
+    lo = ind.scale[0] if ind else 1
+    idx = expert - lo
+    log_event("practice_replay", user_id=user.id, indicator_id=gold["indicator_id"], matched=matched)
+    return PracticeRevealOut(
+        expert_score=expert,
+        expert_label=labels[idx] if 0 <= idx < len(labels) else None,
+        explanation=gold["explanation"],
+        matched=matched,
+        close=abs(body.score - expert) <= cfg["agree_max_diff"],
+        xp_awarded=xp,
+        total_xp=_total_xp(repo, user.id),
+    )
 
 
 # ---------------- voting ----------------

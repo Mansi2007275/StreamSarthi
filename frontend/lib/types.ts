@@ -107,6 +107,8 @@ export type OneHealth = {
 };
 
 export type Observation = ObservationSummary & {
+  site_id: string | null;
+  source: string;
   answers: Answer[];
   trust_breakdown: TrustBreakdown | null;
   review_note: string | null;
@@ -219,6 +221,7 @@ export type MapPoint = {
   submitted_at: string | null;
   is_mine: boolean;
   can_open: boolean;
+  from_station: boolean;
 };
 
 export type MapResponse = {
@@ -455,6 +458,7 @@ export type Home = {
   lesson: Lesson | null;
   quest: Quest | null;
   due_site: DueSite | null;
+  river: River | null;
 };
 
 export type SkillRow = {
@@ -496,6 +500,7 @@ export type Profile = {
   gold_votes: number;
   gold_accuracy: number | null;
   verified_checks: number;
+  practice_xp: number;
   accuracy_by_week: WeeklyAccuracy[];
   skill_map: SkillRow[];
   blind_spots: BlindSpot[];
@@ -560,4 +565,47 @@ export type DueSite = {
   name: string | null;
   due_status: "due_soon" | "due";
   streak_months: number;
+};
+
+// ---------- Stream Stations ----------
+export type StationDot = { month: string; level: string | null };
+
+export type Station = {
+  site_id: string;
+  station_number: number | null;
+  name: string | null;
+  lat: number | null;
+  lng: number | null;
+  last_check: string | null;
+  days_since_check: number | null;
+  total_checks: number;
+  waiting_for_check: boolean;
+  one_health_level: string | null;
+  headline: string | null;
+  recent_months: StationDot[];
+};
+
+// ---------- practice replay ----------
+export type PracticeReveal = {
+  status: "replay";
+  expert_score: number;
+  expert_label: string | null;
+  explanation: string;
+  matched: boolean;
+  close: boolean;
+  xp_awarded: number;
+  total_xp: number;
+};
+
+// ---------- Living River ----------
+export type River = {
+  stage_index: number;
+  stage_id: string;
+  stage_label: string;
+  total_stages: number;
+  shows: string[];
+  caption: string;
+  next_hint: string | null;
+  next_stage_label: string | null;
+  metrics: Record<string, number>;
 };

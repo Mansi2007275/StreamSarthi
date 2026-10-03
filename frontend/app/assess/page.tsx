@@ -42,6 +42,8 @@ function Assess() {
   const toast = useToast();
   const searchParams = useSearchParams();
   const presetSite = searchParams.get("site");
+  // A scan arrives as ?source=station, which tags the observation for the Station Keeper badge.
+  const source = searchParams.get("source") === "station" ? "station" : "app";
   const [indicators, setIndicators] = useState<Indicator[] | null>(null);
   const [obsId, setObsId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -114,7 +116,7 @@ function Assess() {
   ) {
     setBusy(true);
     try {
-      const obs = await api.createObservation(lat, lng, { siteId, siteName: name });
+      const obs = await api.createObservation(lat, lng, { siteId, siteName: name, source });
       setObsId(obs.id);
       setSiteName(obs.site_name);
       setSiteId(obs.site_id);

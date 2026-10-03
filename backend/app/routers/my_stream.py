@@ -10,7 +10,6 @@ enough to point at whoever stood there.
 """
 
 import logging
-from collections import defaultdict
 
 from fastapi import APIRouter, Depends
 
@@ -24,7 +23,7 @@ from app.models.schemas import (
     SiteTimelineOut,
     TimelineEntryOut,
 )
-from app.services import adoption
+from app.services import adoption, site_history
 from app.services.db import RepoProtocol, get_repo
 from app.services.game_config import load_game_config
 
@@ -33,15 +32,10 @@ logger = logging.getLogger("streamsaathi")
 router = APIRouter(prefix="/api/v1", tags=["my-stream"])
 
 COORD_PRECISION = 3  # ~100 m
-VERIFIED_STATUSES = ("verified", "corrected")
 
 
 def _round(value: float | None) -> float | None:
     return round(value, COORD_PRECISION) if value is not None else None
-
-
-def _is_verified(obs: dict) -> bool:
-    return bool(obs.get("crowd_verified")) or obs.get("status") in VERIFIED_STATUSES
 
 
 def _my_check_dates(observations: list[dict], user_id: str) -> list[str]:
@@ -177,30 +171,7 @@ def timeline(
 
     today = adoption.today_utc()
     observations = repo.list_site_observations(site_id)
-    by_month: dict[str, list[dict]] = defaultdict(list)
-    for obs in observations:
-        month = adoption.month_key_of(obs.get("submitted_at"))
-        if month:
-            by_month[month].append(obs)
-
-    entries = []
-    for month in sorted(by_month, reverse=True):
-        rows = sorted(by_month[month], key=lambda o: o.get("submitted_at") or "", reverse=True)
-        newest = rows[0]
-        health = newest.get("one_health") or {}
-        entries.append(
-            TimelineEntryOut(
-                month=month,
-                date=adoption.as_date(newest.get("submitted_at")).isoformat()
-                if newest.get("submitted_at")
-                else None,
-                one_health_level=health.get("level"),
-                worst_indicators=[d["label"] for d in (health.get("drivers") or [])][:3],
-                verified=any(_is_verified(o) for o in rows),
-                checks=len(rows),
-                mine=sum(1 for o in rows if o["user_id"] == user.id),
-            )
-        )
+    entries = [TimelineEntryOut(**e) for e in site_history.monthly_entries(observations, user_id=user.id)]
 
     mine = _my_check_dates(observations, user.id)
     return SiteTimelineOut(

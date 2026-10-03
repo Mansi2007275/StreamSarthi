@@ -1,0 +1,67 @@
+{
+  "caption": "Your river grows only when you're right",
+  "metric_labels": {
+    "verified_checks": { "one": "verified check", "many": "verified checks" },
+    "gold_matches": { "one": "gold match", "many": "gold matches" },
+    "caught_errors": { "one": "error caught", "many": "errors caught" }
+  },
+  "stage_verbs": {
+    "litter_gone": "the litter clears",
+    "clear_water": "the water runs clear",
+    "fish": "fish appear",
+    "frogs": "frogs return",
+    "plants": "plants take the banks",
+    "trees": "trees take hold",
+    "birds": "birds nest"
+  },
+  "stages": [
+    {
+      "id": "neglected",
+      "label": "A neglected stream",
+      "requires": {},
+      "shows": []
+    },
+    {
+      "id": "litter_cleared",
+      "label": "The litter is gone",
+      "requires": { "verified_checks": 1 },
+      "shows": ["litter_gone"]
+    },
+    {
+      "id": "water_clearing",
+      "label": "The water is clearing",
+      "requires": { "verified_checks": 3 },
+      "shows": ["clear_water"]
+    },
+    {
+      "id": "fish_return",
+      "label": "Fish have come back",
+      "requires": { "verified_checks": 5 },
+      "shows": ["fish"]
+    },
+    {
+      "id": "frogs_return",
+      "label": "Frogs on the bank",
+      "requires": { "verified_checks": 8, "gold_matches": 5 },
+      "shows": ["frogs"]
+    },
+    {
+      "id": "banks_green",
+      "label": "The banks are green",
+      "requires": { "verified_checks": 12, "gold_matches": 10 },
+      "shows": ["plants"]
+    },
+    {
+      "id": "trees_hold",
+      "label": "Trees have taken hold",
+      "requires": { "verified_checks": 18, "gold_matches": 15, "caught_errors": 1 },
+      "shows": ["trees"]
+    },
+    {
+      "id": "birds_nest",
+      "label": "Birds are nesting",
+      "requires": { "verified_checks": 25, "gold_matches": 25, "caught_errors": 2 },
+      "shows": ["birds"]
+    }
+  ]
+}

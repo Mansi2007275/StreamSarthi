@@ -23,6 +23,7 @@ class FakeRepo:
         self.sites: dict[str, dict] = {}
         self.crews: dict[str, str] = {}  # user_id -> crew_id (Phase 7 fills this for real)
         self.adoptions: dict[str, dict] = {}
+        self.practice_attempts: list[dict] = []
 
     def ensure_profile(self, user_id, email):
         self.profiles.setdefault(
@@ -50,6 +51,7 @@ class FakeRepo:
             "crowd_verified": False,
             "crew_id": None,
             "site_id": None,
+            "source": "app",   # migration 007 default
         }
         self.observations[oid] = obs
         return dict(obs)
@@ -351,7 +353,15 @@ class FakeRepo:
         return dict(row)
 
     def create_site(self, lat, lng, name):
-        row = {"id": str(uuid.uuid4()), "lat": lat, "lng": lng, "name": name, "created_at": now_iso()}
+        self._station_number = getattr(self, "_station_number", 0) + 1
+        row = {
+            "id": str(uuid.uuid4()),
+            "lat": lat,
+            "lng": lng,
+            "name": name,
+            "created_at": now_iso(),
+            "station_number": self._station_number,   # migration 007 sequence
+        }
         self.sites[row["id"]] = row
         return dict(row)
 
@@ -400,6 +410,16 @@ class FakeRepo:
     def release_adoption(self, adoption_id):
         self.adoptions[adoption_id]["released_at"] = now_iso()
         return dict(self.adoptions[adoption_id])
+
+    def insert_practice_attempt(self, row):
+        saved = {"id": str(uuid.uuid4()), "created_at": now_iso(), **row}
+        self.practice_attempts.append(saved)
+        return dict(saved)
+
+    def list_practice_attempts(self, user_id, limit=200):
+        rows = [a for a in self.practice_attempts if a["user_id"] == user_id]
+        rows.sort(key=lambda a: a["created_at"], reverse=True)
+        return [dict(a) for a in rows[:limit]]
 
     def list_site_observations(self, site_id, user_id=None):
         rows = [

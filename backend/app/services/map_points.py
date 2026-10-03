@@ -47,6 +47,8 @@ def to_map_points(
                 "submitted_at": row.get("submitted_at"),
                 "is_mine": is_mine,
                 "can_open": can_open,
+                # Checks that began at a QR poster, so the map can show where stations work.
+                "from_station": row.get("source") == "station",
             }
         )
     return points

@@ -83,6 +83,9 @@ class RepoProtocol(Protocol):
     def insert_adoption(self, user_id: str, site_id: str) -> dict: ...
     def release_adoption(self, adoption_id: str) -> dict: ...
     def list_site_observations(self, site_id: str, user_id: str | None = None) -> list[dict]: ...
+    # ----- practice replay (XP only, never points) -----
+    def insert_practice_attempt(self, row: dict[str, Any]) -> dict: ...
+    def list_practice_attempts(self, user_id: str, limit: int = 200) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -283,7 +286,7 @@ class SupabaseRepo:
     def list_map_observations(self, statuses):
         res = (
             self.db.table("observations")
-            .select("id, user_id, lat, lng, trust_score, status, one_health, submitted_at")
+            .select("id, user_id, lat, lng, trust_score, status, one_health, submitted_at, source")
             .in_("status", statuses)
             .not_.is_("lat", "null")
             .not_.is_("lng", "null")
@@ -539,6 +542,22 @@ class SupabaseRepo:
         if user_id:
             q = q.eq("user_id", user_id)
         return q.order("submitted_at", desc=True).execute().data or []
+
+    # ---------------- practice replay ----------------
+
+    def insert_practice_attempt(self, row):
+        return self.db.table("practice_attempts").insert(row).execute().data[0]
+
+    def list_practice_attempts(self, user_id, limit=200):
+        res = (
+            self.db.table("practice_attempts")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
 
 
 @lru_cache

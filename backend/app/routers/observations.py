@@ -121,6 +121,8 @@ def _observation_out(obs: dict, answers: list[dict], storage: StorageProtocol | 
         review_note=obs.get("review_note"),
         reviewed_at=obs.get("reviewed_at"),
         one_health=obs.get("one_health"),
+        site_id=obs.get("site_id"),
+        source=obs.get("source") or "app",
         answers=[_answer_out(a, storage) for a in answers],
     )
 
@@ -144,6 +146,8 @@ def create_observation(
 ):
     repo.ensure_profile(user.id, user.email)
     obs = repo.create_observation(user.id, body.lat, body.lng)
+    if body.source != "app":
+        repo.update_observation(obs["id"], {"source": body.source})
 
     # Resolve the site now, while the client still knows what the citizen chose on the site
     # step. A confirmed site must exist; a new place is created here so its name is kept.

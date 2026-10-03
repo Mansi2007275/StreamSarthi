@@ -91,6 +91,12 @@ function Timeline() {
         >
           Check now
         </Link>
+        <Link
+          href={`/s/${data.site_id}/poster`}
+          className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line font-medium"
+        >
+          Get station poster
+        </Link>
       </section>
 
       <section className="rounded-2xl bg-white p-4 shadow-sm">
