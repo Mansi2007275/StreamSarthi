@@ -449,3 +449,189 @@ class MakeGoldOut(BaseModel):
     indicator_id: str
     expert_score: int
     explanation: str
+
+
+# ---------- Phase 5: Home and Profile ----------
+class ReceiptOut(BaseModel):
+    id: str
+    kind: str
+    message: str
+    ref_id: str | None = None
+    seen: bool
+    created_at: str | None = None
+
+
+class ReceiptsPage(BaseModel):
+    items: list[ReceiptOut]
+    total: int
+    unseen_count: int
+    offset: int
+    limit: int
+
+
+class LevelOut(BaseModel):
+    id: str
+    label: str
+    index: int
+
+
+class LevelRequirementOut(BaseModel):
+    key: str
+    label: str
+    current: float
+    target: float
+    met: bool
+
+
+class NextLevelOut(BaseModel):
+    id: str
+    label: str
+    percent: int
+    requirements: list[LevelRequirementOut]
+    # One plain sentence of what is missing, so the UI never has to compose it.
+    summary: str
+
+
+class PointsOut(BaseModel):
+    awarded: int
+    pending: int
+
+
+class QuestOut(BaseModel):
+    id: str
+    label: str
+    description: str
+    type: str
+    window: str
+    target: int
+    current: int
+    done: bool
+    percent: int
+
+
+class HomeOut(BaseModel):
+    """Everything Home needs, in one call. Cards the client should hide come back empty."""
+
+    display_name: str | None
+    level: LevelOut
+    points: PointsOut
+    onboarded: bool
+    receipts: list[ReceiptOut] = []
+    unseen_receipts: int = 0
+    lesson: LessonOut | None = None
+    quest: QuestOut | None = None
+    # Card (d): only set when an adopted site actually wants a visit. Crews stay out until Phase 7.
+    due_site: "DueSiteOut | None" = None
+
+
+class SkillRowOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    accuracy: float | None
+    weight: float
+    # strong | ok | focus | unknown  (weak is shown as "focus": something to work on)
+    standing: str
+
+
+class WeeklyAccuracyOut(BaseModel):
+    week_start: str
+    n: int
+    accuracy: float | None
+
+
+class BlindSpotOut(BaseModel):
+    indicator_id: str
+    label: str
+    n: int
+    mean_signed_error: float
+    direction: str
+    message: str
+
+
+class BadgeOut(BaseModel):
+    id: str
+    label: str
+    description: str
+    icon: str
+    unlocked: bool
+    current: int
+    target: int
+
+
+class ProfileOut(BaseModel):
+    display_name: str | None
+    role: str
+    level: LevelOut
+    next_level: NextLevelOut | None
+    points: PointsOut
+    gold_votes: int
+    gold_accuracy: float | None
+    verified_checks: int
+    accuracy_by_week: list[WeeklyAccuracyOut]
+    skill_map: list[SkillRowOut]
+    blind_spots: list[BlindSpotOut]
+    badges: list[BadgeOut]
+
+
+# ---------- Phase 6: Adopt-a-Stream ----------
+class AdoptedSiteOut(BaseModel):
+    """Coordinates are rounded to ~100 m: enough to find the stream, not enough to point at
+    the person who checked it."""
+
+    site_id: str
+    name: str | None
+    lat: float | None
+    lng: float | None
+    adopted_at: str | None
+    last_check: str | None
+    next_check_due: str | None
+    due_status: Literal["ok", "due_soon", "due"]
+    streak_months: int
+    checks: int
+    one_health_level: str | None
+    others_this_month: int
+
+
+class MyStreamOut(BaseModel):
+    sites: list[AdoptedSiteOut]
+    max_sites: int
+    can_adopt_more: bool
+
+
+class TimelineEntryOut(BaseModel):
+    """One month at a site, aggregated across everybody who checked it."""
+
+    month: str
+    date: str | None
+    one_health_level: str | None
+    worst_indicators: list[str] = []
+    verified: bool
+    checks: int
+    mine: int
+
+
+class SiteTimelineOut(BaseModel):
+    site_id: str
+    name: str | None
+    lat: float | None
+    lng: float | None
+    adopted: bool
+    streak_months: int
+    due_status: Literal["ok", "due_soon", "due"]
+    entries: list[TimelineEntryOut]
+
+
+class AdoptionOut(BaseModel):
+    site_id: str
+    name: str | None
+    adopted: bool
+    adopted_count: int
+    max_sites: int
+
+
+class DueSiteOut(BaseModel):
+    site_id: str
+    name: str | None
+    due_status: Literal["due_soon", "due"]
+    streak_months: int

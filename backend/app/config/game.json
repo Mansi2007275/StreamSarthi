@@ -15,6 +15,7 @@
   },
   "max_adopted_sites": 3,
   "adopted_check_interval_days": 30,
+  "adopted_due_soon_days": 5,
   "vote_rate_limit_per_minute": 60,
   "consensus": {
     "min_votes": 3,

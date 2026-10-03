@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { api, friendlyMessage } from "@/lib/api";
 import type { SubmitResult } from "@/lib/types";
 
 const REASON_TEXT: Record<string, string> = {
@@ -22,9 +24,32 @@ function reasonLine(codes: string[]): string | null {
  *
  *  Points are shown as pending, never as earned, because that is the whole bargain here:
  *  posting earns nothing until somebody confirms the work. */
-export default function SubmitSuccess({ result }: { result: SubmitResult }) {
+export default function SubmitSuccess({
+  result,
+  siteId,
+  siteName,
+  canAdopt = false,
+}: {
+  result: SubmitResult;
+  siteId?: string | null;
+  siteName?: string | null;
+  canAdopt?: boolean;
+}) {
   const toExpert = result.routed_to === "expert";
   const why = reasonLine(result.routing_reasons);
+  const [adoptState, setAdoptState] = useState<"offer" | "busy" | "done" | "failed">("offer");
+
+  async function adopt() {
+    if (!siteId) return;
+    setAdoptState("busy");
+    try {
+      await api.adoptSite(siteId);
+      setAdoptState("done");
+    } catch (e) {
+      setAdoptState("failed");
+      console.warn(friendlyMessage(e));
+    }
+  }
 
   return (
     <div className="space-y-4 rounded-2xl bg-white p-6 text-center shadow-sm">
@@ -49,6 +74,28 @@ export default function SubmitSuccess({ result }: { result: SubmitResult }) {
         </p>
         {why && <p className="mt-2 text-xs text-muted">{why}</p>}
       </div>
+
+      {siteId && canAdopt && adoptState !== "done" && (
+        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-left">
+          <p className="text-sm font-semibold text-brand-900">Adopt this site?</p>
+          <p className="mt-1 text-sm text-brand-900">
+            Check {siteName ?? "it"} once a month and you will see how it changes over the year.
+          </p>
+          <button
+            onClick={adopt}
+            disabled={adoptState === "busy"}
+            className="mt-2 min-h-11 w-full rounded-xl bg-brand-600 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {adoptState === "busy" ? "Adopting..." : adoptState === "failed" ? "Try again" : "Adopt this site"}
+          </button>
+        </div>
+      )}
+
+      {adoptState === "done" && (
+        <p className="rounded-2xl bg-brand-50 p-3 text-sm font-medium text-brand-700">
+          Adopted. We will remind you when the next check is due.
+        </p>
+      )}
 
       <Link
         href={`/observations/${result.id}`}

@@ -10,6 +10,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/play", label: "Play" },
   { href: "/assess", label: "New" },
+  { href: "/profile", label: "Profile" },
   { href: "/observations", label: "History" },
   { href: "/map", label: "Map" },
 ];
@@ -35,7 +36,7 @@ export default function NavBar({ email }: { email: string }) {
           <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500 text-white">~</span>
           <span className="hidden sm:inline">StreamSaathi</span>
         </Link>
-        <nav className="flex items-center gap-0.5 text-sm">
+        <nav className="hidden items-center gap-0.5 text-sm md:flex">
           {allLinks.map((l) => {
             const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
             return (
@@ -51,10 +52,10 @@ export default function NavBar({ email }: { email: string }) {
               </Link>
             );
           })}
-          <button onClick={signOut} title={email} className="min-h-11 rounded-lg px-2 text-muted hover:text-ink">
-            Logout
-          </button>
         </nav>
+        <button onClick={signOut} title={email} className="min-h-11 rounded-lg px-2 text-sm text-muted hover:text-ink">
+          Logout
+        </button>
       </div>
     </header>
   );

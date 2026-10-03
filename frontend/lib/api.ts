@@ -1,6 +1,11 @@
 import { supabase } from "./supabase";
 import type {
+  Adoption,
   AuditResponse,
+  Home as HomeData,
+  Profile,
+  Receipt,
+  ReceiptsPage,
   Answer,
   CalibrationAnswerResult,
   CalibrationCompleteResult,
@@ -11,8 +16,9 @@ import type {
   IndicatorResult,
   Lesson,
   LessonsPage,
-  MapResponse,
   MadeGold,
+  MapResponse,
+  MyStream,
   Me,
   NearestSite,
   Observation,
@@ -25,6 +31,7 @@ import type {
   ReviewDetail,
   ReviewQueuePage,
   ReviewStats,
+  SiteTimeline,
   SubmitResult,
   VoteResult,
 } from "./types";
@@ -99,6 +106,10 @@ export const api = {
       json: { lat, lng, site_id: site.siteId ?? null, site_name: site.siteName ?? null },
     }),
   sitesNear: (lat: number, lng: number) => request<NearestSite>(`/api/v1/sites/near?lat=${lat}&lng=${lng}`),
+  myStream: () => request<MyStream>("/api/v1/my-stream"),
+  adoptSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/adopt`, { method: "POST" }),
+  releaseSite: (siteId: string) => request<Adoption>(`/api/v1/sites/${siteId}/release`, { method: "POST" }),
+  siteTimeline: (siteId: string) => request<SiteTimeline>(`/api/v1/sites/${siteId}/timeline`),
   answerIndicator: (
     obsId: string,
     indicatorId: string,
@@ -131,6 +142,11 @@ export const api = {
   observation: (obsId: string) => request<Observation>(`/api/v1/observations/${obsId}`),
   observationAudit: (obsId: string) => request<AuditResponse>(`/api/v1/observations/${obsId}/audit`),
   me: () => request<Me>("/api/v1/me"),
+  home: () => request<HomeData>("/api/v1/home"),
+  profile: () => request<Profile>("/api/v1/me/profile"),
+  receipts: (offset = 0, limit = 20, unseen = false) =>
+    request<ReceiptsPage>(`/api/v1/receipts?offset=${offset}&limit=${limit}&unseen=${unseen}`),
+  markReceiptSeen: (id: string) => request<Receipt>(`/api/v1/receipts/${id}/seen`, { method: "POST" }),
   reviewQueue: (status: "needs_review" | "submitted", offset = 0, limit = 20) =>
     request<ReviewQueuePage>(`/api/v1/review/queue?status=${status}&offset=${offset}&limit=${limit}`),
   reviewDetail: (obsId: string) => request<ReviewDetail>(`/api/v1/review/${obsId}`),

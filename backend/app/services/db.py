@@ -24,6 +24,8 @@ class RepoProtocol(Protocol):
     def create_observation(self, user_id: str, lat: float | None, lng: float | None) -> dict: ...
     def get_observation(self, obs_id: str) -> dict | None: ...
     def list_observations(self, user_id: str, offset: int, limit: int) -> tuple[list[dict], int]: ...
+    def list_observations_since(self, user_id: str, since_iso: str) -> list[dict]: ...
+    def list_answers_for_user(self, user_id: str) -> list[dict]: ...
     def update_observation(self, obs_id: str, fields: dict[str, Any]) -> dict: ...
     def upsert_answer(self, row: dict[str, Any]) -> dict: ...
     def get_answer(self, obs_id: str, indicator_id: str) -> dict | None: ...
@@ -63,7 +65,10 @@ class RepoProtocol(Protocol):
     def list_points(self, user_id: str, status: str | None = None) -> list[dict]: ...
     def settle_points(self, updates: list[dict[str, Any]]) -> int: ...
     def insert_receipt(self, row: dict[str, Any]) -> dict: ...
-    def list_receipts(self, user_id: str, unseen_only: bool = False, limit: int = 20) -> list[dict]: ...
+    def list_receipts(
+        self, user_id: str, unseen_only: bool = False, limit: int = 20, offset: int = 0
+    ) -> list[dict]: ...
+    def count_receipts(self, user_id: str, unseen_only: bool = False) -> int: ...
     def get_receipt(self, receipt_id: str) -> dict | None: ...
     def mark_receipt_seen(self, receipt_id: str) -> dict: ...
     def list_user_badges(self, user_id: str) -> list[dict]: ...
@@ -72,6 +77,12 @@ class RepoProtocol(Protocol):
     def get_site(self, site_id: str) -> dict | None: ...
     def list_sites(self) -> list[dict]: ...
     def crew_id_for_user(self, user_id: str) -> str | None: ...
+    # ----- Phase 6: Adopt-a-Stream -----
+    def list_adoptions(self, user_id: str) -> list[dict]: ...
+    def get_adoption(self, user_id: str, site_id: str) -> dict | None: ...
+    def insert_adoption(self, user_id: str, site_id: str) -> dict: ...
+    def release_adoption(self, adoption_id: str) -> dict: ...
+    def list_site_observations(self, site_id: str, user_id: str | None = None) -> list[dict]: ...
 
 
 def now_iso() -> str:
@@ -100,7 +111,7 @@ class SupabaseRepo:
     def list_observations(self, user_id, offset, limit):
         res = (
             self.db.table("observations")
-            .select("*", count="exact")
+            .select("*")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .range(offset, offset + limit - 1)
@@ -241,6 +252,34 @@ class SupabaseRepo:
         res = self.db.table("lessons").update({"seen": True, "seen_at": now_iso()}).eq("id", lesson_id).execute()
         return res.data[0]
 
+    def list_observations_since(self, user_id, since_iso):
+        """This user's observations submitted on or after a timestamp, for the weekly quest."""
+        res = (
+            self.db.table("observations")
+            .select("id, status, crowd_verified, submitted_at, site_id, lat, lng")
+            .eq("user_id", user_id)
+            .gte("submitted_at", since_iso)
+            .execute()
+        )
+        return res.data or []
+
+    def list_answers_for_user(self, user_id):
+        """Every answer this user has given, with the crowd/expert verdicts the profile needs."""
+        res = (
+            self.db.table("indicator_answers")
+            .select(
+                "id, observation_id, indicator_id, human_score, ai_score, used_ai_answer, expert_score, "
+                "crowd_score, crowd_status, observations!inner(user_id)"
+            )
+            .eq("observations.user_id", user_id)
+            .execute()
+        )
+        rows = []
+        for r in res.data or []:
+            r.pop("observations", None)
+            rows.append(r)
+        return rows
+
     def list_map_observations(self, statuses):
         res = (
             self.db.table("observations")
@@ -302,7 +341,7 @@ class SupabaseRepo:
         """Everything this player has already judged, so a round never offers it twice."""
         res = (
             self.db.table("validation_votes")
-            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct")
+            .select("id, answer_id, gold_item_id, indicator_id, score, is_gold, correct, created_at")
             .eq("voter_id", voter_id)
             .execute()
         )
@@ -391,11 +430,23 @@ class SupabaseRepo:
     def insert_receipt(self, row):
         return self.db.table("receipts").insert(row).execute().data[0]
 
-    def list_receipts(self, user_id, unseen_only=False, limit=20):
-        q = self.db.table("receipts").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(limit)
+    def list_receipts(self, user_id, unseen_only=False, limit=20, offset=0):
+        q = (
+            self.db.table("receipts")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+        )
         if unseen_only:
             q = q.eq("seen", False)
         return q.execute().data or []
+
+    def count_receipts(self, user_id, unseen_only=False):
+        q = self.db.table("receipts").select("id", count="exact").eq("user_id", user_id)
+        if unseen_only:
+            q = q.eq("seen", False)
+        return q.execute().count or 0
 
     def get_receipt(self, receipt_id):
         res = self.db.table("receipts").select("*").eq("id", receipt_id).limit(1).execute()
@@ -429,6 +480,65 @@ class SupabaseRepo:
         """Crews land in Phase 7. Until then nobody has one, so the crew anti-cheat rule
         is live and tested but has nothing to exclude on."""
         return None
+
+    # ---------------- Phase 6: Adopt-a-Stream ----------------
+
+    def list_adoptions(self, user_id):
+        """Active adoptions only, with the site joined in."""
+        res = (
+            self.db.table("site_adoptions")
+            .select("id, site_id, adopted_at, sites!inner(id, name, lat, lng)")
+            .eq("user_id", user_id)
+            .is_("released_at", "null")
+            .order("adopted_at")
+            .execute()
+        )
+        rows = []
+        for r in res.data or []:
+            site = r.pop("sites") or {}
+            rows.append({**r, "site": site})
+        return rows
+
+    def get_adoption(self, user_id, site_id):
+        res = (
+            self.db.table("site_adoptions")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("site_id", site_id)
+            .is_("released_at", "null")
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+
+    def insert_adoption(self, user_id, site_id):
+        res = self.db.table("site_adoptions").insert({"user_id": user_id, "site_id": site_id}).execute()
+        return res.data[0]
+
+    def release_adoption(self, adoption_id):
+        res = (
+            self.db.table("site_adoptions")
+            .update({"released_at": now_iso()})
+            .eq("id", adoption_id)
+            .execute()
+        )
+        return res.data[0]
+
+    def list_site_observations(self, site_id, user_id=None):
+        """Submitted observations at a site. `user_id` narrows it to that person's own.
+
+        Selects no identifying columns beyond user_id itself, which callers use to filter
+        and never put in a response.
+        """
+        q = (
+            self.db.table("observations")
+            .select("id, user_id, status, crowd_verified, submitted_at, one_health, reviewed_at")
+            .eq("site_id", site_id)
+            .neq("status", "draft")
+        )
+        if user_id:
+            q = q.eq("user_id", user_id)
+        return q.order("submitted_at", desc=True).execute().data or []
 
 
 @lru_cache

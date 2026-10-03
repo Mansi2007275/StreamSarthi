@@ -22,6 +22,7 @@ class FakeRepo:
         self.user_badges: list[dict] = []
         self.sites: dict[str, dict] = {}
         self.crews: dict[str, str] = {}  # user_id -> crew_id (Phase 7 fills this for real)
+        self.adoptions: dict[str, dict] = {}
 
     def ensure_profile(self, user_id, email):
         self.profiles.setdefault(
@@ -184,6 +185,17 @@ class FakeRepo:
         self.lessons[lesson_id]["seen_at"] = now_iso()
         return dict(self.lessons[lesson_id])
 
+    def list_observations_since(self, user_id, since_iso):
+        return [
+            dict(o)
+            for o in self.observations.values()
+            if o["user_id"] == user_id and (o.get("submitted_at") or "") >= since_iso
+        ]
+
+    def list_answers_for_user(self, user_id):
+        mine = {o["id"] for o in self.observations.values() if o["user_id"] == user_id}
+        return [dict(a) for a in self.answers.values() if a["observation_id"] in mine]
+
     def list_map_observations(self, statuses):
         return [
             dict(o)
@@ -307,12 +319,18 @@ class FakeRepo:
         self.receipts[row["id"]] = row
         return dict(row)
 
-    def list_receipts(self, user_id, unseen_only=False, limit=20):
+    def list_receipts(self, user_id, unseen_only=False, limit=20, offset=0):
         rows = [r for r in self.receipts.values() if r["user_id"] == user_id]
         if unseen_only:
             rows = [r for r in rows if not r["seen"]]
         rows.sort(key=lambda r: r["created_at"], reverse=True)
-        return [dict(r) for r in rows[:limit]]
+        return [dict(r) for r in rows[offset : offset + limit]]
+
+    def count_receipts(self, user_id, unseen_only=False):
+        rows = [r for r in self.receipts.values() if r["user_id"] == user_id]
+        if unseen_only:
+            rows = [r for r in rows if not r["seen"]]
+        return len(rows)
 
     def get_receipt(self, receipt_id):
         r = self.receipts.get(receipt_id)
@@ -346,6 +364,53 @@ class FakeRepo:
 
     def crew_id_for_user(self, user_id):
         return self.crews.get(user_id)
+
+    # ---------------- Phase 6: Adopt-a-Stream ----------------
+
+    def list_adoptions(self, user_id):
+        rows = [
+            a
+            for a in self.adoptions.values()
+            if a["user_id"] == user_id and a.get("released_at") is None
+        ]
+        rows.sort(key=lambda a: a["adopted_at"])
+        return [{**dict(a), "site": dict(self.sites.get(a["site_id"]) or {})} for a in rows]
+
+    def get_adoption(self, user_id, site_id):
+        return next(
+            (
+                dict(a)
+                for a in self.adoptions.values()
+                if a["user_id"] == user_id and a["site_id"] == site_id and a.get("released_at") is None
+            ),
+            None,
+        )
+
+    def insert_adoption(self, user_id, site_id):
+        row = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "site_id": site_id,
+            "adopted_at": now_iso(),
+            "released_at": None,
+        }
+        self.adoptions[row["id"]] = row
+        return dict(row)
+
+    def release_adoption(self, adoption_id):
+        self.adoptions[adoption_id]["released_at"] = now_iso()
+        return dict(self.adoptions[adoption_id])
+
+    def list_site_observations(self, site_id, user_id=None):
+        rows = [
+            o
+            for o in self.observations.values()
+            if o.get("site_id") == site_id
+            and o.get("status") != "draft"
+            and (user_id is None or o["user_id"] == user_id)
+        ]
+        rows.sort(key=lambda o: o.get("submitted_at") or "", reverse=True)
+        return [dict(o) for o in rows]
 
 
 class FakeStorage:

@@ -91,6 +91,51 @@ def evaluate(stats: dict, unlocked: set[str] | None = None, badges: list[dict] |
     return out
 
 
+def _count_for(rule: dict, stats: dict) -> int:
+    rule_type = rule["type"]
+    if rule_type == "onboarded":
+        return 1 if stats.get("onboarded") else 0
+    if rule_type == "distinct_verified_indicators":
+        return len(set(stats.get("verified_indicators") or ()))
+    if rule_type == "distinct_verified_sites":
+        return len(set(stats.get("verified_sites") or ()))
+    if rule_type == "verified_check_in_months":
+        return 1 if set(stats.get("verified_check_months") or ()) & set(rule["months"]) else 0
+    # The remaining rule types are plain counters whose stats key matches the rule type.
+    return int(stats.get(rule_type) or 0)
+
+
+def progress_for(rule: dict, stats: dict) -> tuple[int, int]:
+    """(current, target) so a locked badge can show how close it is, e.g. 4/10.
+
+    Showing the distance is the point: "locked" alone tells somebody nothing about whether
+    it is within reach this week or months away.
+    """
+    target = int(rule.get("min", 1))
+    return min(_count_for(rule, stats), target), target
+
+
+def with_progress(stats: dict, unlocked: set[str], badges: list[dict] | None = None) -> list[dict]:
+    """Every badge with its unlocked flag and progress, unlocked ones first."""
+    rows = []
+    for badge in badges if badges is not None else load_badges():
+        current, target = progress_for(badge["rule"], stats)
+        is_unlocked = badge["id"] in unlocked
+        rows.append(
+            {
+                "id": badge["id"],
+                "label": badge["label"],
+                "description": badge["description"],
+                "icon": badge["icon"],
+                "unlocked": is_unlocked,
+                "current": target if is_unlocked else current,
+                "target": target,
+            }
+        )
+    rows.sort(key=lambda b: (not b["unlocked"], -b["current"] / b["target"] if b["target"] else 0))
+    return rows
+
+
 def with_status(unlocked: set[str], badges: list[dict] | None = None) -> list[dict]:
     """Every badge plus whether it is earned - locked ones stay visible, with the
     description telling the player how to get there."""

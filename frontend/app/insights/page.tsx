@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import ExpertGate from "@/components/ExpertGate";
+import ProofPanel from "@/components/ProofPanel";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Disagreement } from "@/lib/types";
 
@@ -127,9 +128,15 @@ function Insights() {
 export default function InsightsPage() {
   return (
     <AuthGuard>
-      <ExpertGate>
-        <Insights />
-      </ExpertGate>
+      <div className="space-y-5">
+        {/* The proof numbers are aggregates with no personal data, and they are the claim
+            the whole project rests on, so every volunteer can see them. The per-indicator
+            heatmap below is an internal tool and stays expert-only. */}
+        <ProofPanel />
+        <ExpertGate quiet>
+          <Insights />
+        </ExpertGate>
+      </div>
     </AuthGuard>
   );
 }

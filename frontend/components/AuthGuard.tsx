@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/useSession";
+import BottomTabBar from "./BottomTabBar";
 import NavBar from "./NavBar";
 
 /** Wrap any page that needs login. Redirects to /login when logged out. */
@@ -26,7 +27,10 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   return (
     <>
       <NavBar email={session.user.email ?? ""} />
-      <main className="mx-auto w-full max-w-xl flex-1 p-4 pb-24">{children}</main>
+      {/* pb-28 clears the mobile tab bar; a fixed bar would otherwise sit on top of the
+          last element of every page. */}
+      <main className="mx-auto w-full max-w-xl flex-1 p-4 pb-28 md:pb-24">{children}</main>
+      <BottomTabBar />
     </>
   );
 }
