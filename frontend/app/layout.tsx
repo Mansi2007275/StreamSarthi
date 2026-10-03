@@ -3,8 +3,12 @@ import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StreamSaathi",
-  description: "An AI second opinion that makes every citizen stream observation more reliable.",
+  title: { default: "StreamSaathi", template: "%s · StreamSaathi" },
+  applicationName: "StreamSaathi",
+  description:
+    "Citizen stream monitoring where points come from being right, not from posting more. " +
+    "Every game round is also quality control.",
+  appleWebApp: { title: "StreamSaathi", capable: true },
 };
 
 export const viewport: Viewport = {
