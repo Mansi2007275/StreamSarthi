@@ -1,11 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import AuthGuard from "@/components/AuthGuard";
 import ConfidencePicker from "@/components/ConfidencePicker";
 import GoldReveal from "@/components/GoldReveal";
 import PhotoQuestion from "@/components/PhotoQuestion";
+import PlayHeader from "@/components/PlayHeader";
+import RoundSummary from "@/components/RoundSummary";
+import VoteAckCard from "@/components/VoteAckCard";
+import Button from "@/components/ui/Button";
+import CardStack from "@/components/ui/CardStack";
+import Chip from "@/components/ui/Chip";
+import DropletLoader from "@/components/ui/DropletLoader";
+import EmptyState from "@/components/ui/EmptyState";
+import SolidCard from "@/components/ui/SolidCard";
 import { ApiError, api, friendlyMessage } from "@/lib/api";
 import type { Confidence, GoldReveal as GoldRevealData, PlayItem, VoteAck } from "@/lib/types";
 
@@ -23,9 +32,8 @@ function Play() {
   const [tally, setTally] = useState<Summary>({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0 });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const reduce = useReducedMotion();
 
-  /** Kicks off the request only. State is set in the promise callbacks, never synchronously
-   *  in the effect body, which would cascade renders. */
   const fetchRound = useCallback(() => {
     api
       .playRound()
@@ -37,7 +45,6 @@ function Play() {
     fetchRound();
   }, [fetchRound]);
 
-  /** "Play another round" / "Try again": clear the previous round, then refetch. */
   const loadRound = useCallback(() => {
     setItems(null);
     setError(null);
@@ -53,97 +60,47 @@ function Play() {
 
   if (error) {
     return (
-      <div className="space-y-3 rounded-2xl bg-white p-5 text-center shadow-sm">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={loadRound} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Try again
-        </button>
-      </div>
+      <SolidCard className="space-y-3 p-5 text-center">
+        <p className="text-sm text-coral">{error}</p>
+        <Button onClick={loadRound} className="w-full">Try again</Button>
+      </SolidCard>
     );
   }
 
   if (!items) {
-    return (
-      <div className="space-y-3">
-        <div className="skeleton h-4 w-1/3" />
-        <div className="skeleton h-7 w-2/3" />
-        <div className="skeleton aspect-[4/3] w-full" />
-        <div className="skeleton h-40" />
-      </div>
-    );
+    return <DropletLoader label="Loading your round…" />;
   }
 
   if (items.length === 0) {
     return (
-      <div className="space-y-4 rounded-2xl bg-white p-6 text-center shadow-sm">
-        <p className="text-4xl" aria-hidden>
-          🌱
-        </p>
-        <h1 className="text-xl font-semibold">Nothing to check right now</h1>
-        <p className="text-muted">
-          You have seen every practice photo and no new stream photos are waiting. Go and check a real stream — someone
-          else will check yours.
-        </p>
-        <Link
-          href="/assess"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-600 px-5 font-semibold text-white"
-        >
-          Check a real stream
-        </Link>
-        <Link
-          href="/play/practice"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line font-medium"
-        >
-          Replay practice photos
-        </Link>
-        <Link href="/" className="block min-h-11 pt-3 text-sm text-muted underline">
-          Back home
-        </Link>
-      </div>
+      <EmptyState
+        title="Nothing to check right now"
+        description="You have seen every practice photo and no new stream photos are waiting. Check a real stream — someone else will check yours."
+        actionHref="/assess"
+        actionLabel="Check a real stream"
+      >
+        <div className="mt-3 space-y-2">
+          <Button href="/play/practice" variant="secondary" className="w-full">Replay practice photos</Button>
+          <Button href="/" variant="ghost" className="w-full">Back home</Button>
+        </div>
+      </EmptyState>
     );
   }
 
   if (summary) {
     return (
-      <div className="space-y-4 rounded-2xl bg-white p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold">Round complete</h1>
-        <p className="pop-in text-4xl font-bold text-brand-700">+{summary.points}</p>
-        <p className="text-muted">points from this round</p>
-        <dl className="grid grid-cols-2 gap-3 text-left text-sm">
-          <div className="rounded-xl bg-surface p-3">
-            <dt className="text-muted">Photos checked</dt>
-            <dd className="text-lg font-semibold">{summary.judged}</dd>
-          </div>
-          <div className="rounded-xl bg-surface p-3">
-            <dt className="text-muted">Practice matched</dt>
-            <dd className="text-lg font-semibold">
-              {summary.goldSeen ? `${summary.goldMatched}/${summary.goldSeen}` : "—"}
-            </dd>
-          </div>
-        </dl>
-        <p className="text-sm text-muted">
-          Your votes on real photos count once enough Guardians agree. You will get a receipt when they do.
-        </p>
-        <button onClick={loadRound} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Play another round
-        </button>
-        <Link
-          href="/play/practice"
-          className="block min-h-11 rounded-xl border border-line pt-3 text-center font-medium"
-        >
-          Replay practice photos
-        </Link>
-        <Link href="/" className="block min-h-11 pt-3 text-center text-sm text-muted underline">
-          Back home
-        </Link>
-      </div>
+      <RoundSummary
+        points={summary.points}
+        judged={summary.judged}
+        goldMatched={summary.goldMatched}
+        goldSeen={summary.goldSeen}
+        onPlayAgain={loadRound}
+      />
     );
   }
 
   const item = items[index];
   const isLast = index === items.length - 1;
-  // "already voted" counts as answered: the player is finished with this photo either way,
-  // so they always get a way forward instead of a dead end.
   const answered = reveal !== null || ack !== null || alreadyDone;
 
   async function submitVote() {
@@ -161,8 +118,6 @@ function Play() {
       if (result.status === "revealed") setReveal(result);
       else setAck(result);
     } catch (e) {
-      // 409 is not a failure: this photo was already judged (a second tab, a double tap, a
-      // stale round). Say so calmly and let them move on.
       if (e instanceof ApiError && e.code === "ALREADY_VOTED") {
         setAlreadyDone(true);
       } else {
@@ -189,71 +144,68 @@ function Play() {
 
   return (
     <div className="space-y-4">
-      <PhotoQuestion
-        label={item.indicator.label}
-        help={item.indicator.help?.en}
-        imageUrl={item.image_url}
-        scale={item.indicator.scale}
-        scaleLabels={item.indicator.scale_labels}
-        score={score}
-        onScore={setScore}
-        disabled={answered || busy}
+      <PlayHeader
+        title="Spot Check"
+        subtitle="Score photos blind — practice shots are mixed in secretly."
         step={index + 1}
         total={items.length}
+        badge={tally.points > 0 ? `+${tally.points} pts` : undefined}
       />
 
-      {!answered && <ConfidencePicker value={confidence} onChange={setConfidence} disabled={busy} />}
+      <CardStack cardKey={item.id}>
+        <PhotoQuestion
+          label={item.indicator.label}
+          help={item.indicator.help?.en}
+          imageUrl={item.image_url}
+          scale={item.indicator.scale}
+          scaleLabels={item.indicator.scale_labels}
+          score={score}
+          onScore={setScore}
+          disabled={answered || busy}
+          step={index + 1}
+          total={items.length}
+          hideProgress
+        />
+      </CardStack>
+
+      {!answered && (
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <ConfidencePicker value={confidence} onChange={setConfidence} disabled={busy} />
+        </motion.div>
+      )}
 
       {error && (
-        <div className="rounded-xl bg-red-50 p-3">
-          <p className="text-sm text-red-700">{error}</p>
-          <button
-            onClick={next}
-            className="mt-2 min-h-11 w-full rounded-xl border border-red-200 bg-white text-sm font-medium"
-          >
+        <SolidCard className="space-y-2 p-4">
+          <p className="text-sm text-coral">{error}</p>
+          <Button variant="secondary" onClick={next} className="w-full">
             {isLast ? "Skip this photo and finish" : "Skip this photo"}
-          </button>
-        </div>
+          </Button>
+        </SolidCard>
       )}
 
       {!answered && (
-        <button
-          onClick={submitVote}
-          disabled={score === null || busy}
-          className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Saving..." : "Submit my score"}
-        </button>
+        <Button onClick={submitVote} disabled={score === null || busy} className="w-full">
+          {busy ? "Sending your score…" : "Submit my score"}
+        </Button>
       )}
 
       {alreadyDone && (
-        <div className="pop-in rounded-2xl border border-line bg-surface p-4" role="status" aria-live="polite">
-          <p className="font-semibold">You&apos;ve already checked this photo, thanks!</p>
-          <p className="mt-1 text-sm text-muted">
-            Your earlier answer still counts. Nothing to do here again.
-          </p>
-          <button onClick={next} className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-            {isLast ? "See my round" : "Next photo"}
-          </button>
+        <div role="status" aria-live="polite">
+        <SolidCard className="space-y-2 p-4">
+          <Chip tone="mint">Already counted</Chip>
+          <p className="font-semibold text-ink">You&apos;ve already checked this photo, thanks!</p>
+          <p className="text-sm text-muted">Your earlier answer still counts.</p>
+          <Button onClick={next} className="w-full">{isLast ? "See my round" : "Next photo"}</Button>
+        </SolidCard>
         </div>
       )}
 
       {reveal && <GoldReveal reveal={reveal} onNext={next} isLast={isLast} busy={busy} />}
-
-      {ack && (
-        <div className="pop-in rounded-2xl border border-brand-200 bg-brand-50 p-4" role="status" aria-live="polite">
-          <p className="font-semibold text-brand-700">Thanks!</p>
-          <p className="mt-1 text-sm">{ack.message}</p>
-          {ack.votes_needed > 0 && (
-            <p className="mt-1 text-sm text-muted">
-              {ack.votes_needed} more {ack.votes_needed === 1 ? "Guardian" : "Guardians"} needed on this photo.
-            </p>
-          )}
-          <button onClick={next} className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-            {isLast ? "See my round" : "Next photo"}
-          </button>
-        </div>
-      )}
+      {ack && <VoteAckCard ack={ack} onNext={next} isLast={isLast} />}
     </div>
   );
 }

@@ -1,68 +1,103 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Proof } from "@/lib/types";
+import CountUp from "@/components/ui/CountUp";
+import LiquidProgress from "@/components/ui/LiquidProgress";
+import SolidCard from "@/components/ui/SolidCard";
+import Skeleton from "@/components/ui/Skeleton";
 
-function Bar({ label, value, n, tone }: { label: string; value: number | null; n: number; tone: string }) {
+function Bar({
+  label,
+  value,
+  n,
+}: {
+  label: string;
+  value: number | null;
+  n: number;
+}) {
+  const pct = (value ?? 0) * 100;
   return (
     <li>
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span>{label}</span>
-        <span className="shrink-0 font-semibold">{value === null ? "no data yet" : `${Math.round(value * 100)}%`}</span>
+        <span className="text-ink">{label}</span>
+        <span className="shrink-0 font-bold text-deep">
+          {value === null ? "no data yet" : (
+            <CountUp value={Math.round(pct)} suffix="%" />
+          )}
+        </span>
       </div>
-      <div className="mt-1 h-3 overflow-hidden rounded-full bg-surface">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${(value ?? 0) * 100}%` }} />
-      </div>
+      <LiquidProgress
+        value={pct}
+        className="mt-2"
+        height={12}
+      />
       <p className="mt-0.5 text-xs text-muted">n = {n}</p>
     </li>
   );
 }
 
-/** Does peer validation actually improve the data? Both lines are measured on the same
- *  expert-scored answers, so the comparison is honest, and the sample size is always shown
- *  — at n = 2 the percentages mean very little and the page should say so. */
 export default function ProofPanel() {
   const [proof, setProof] = useState<Proof | null>(null);
   const [error, setError] = useState<string | null>(null);
-
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
     api.proof().then(setProof).catch((e) => setError(friendlyMessage(e)));
   }, []);
 
-  if (error) return <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>;
-  if (!proof) return <div className="skeleton h-48" />;
+  if (error) return <p className="rounded-2xl bg-coral/15 p-3 text-sm text-deep">{error}</p>;
+  if (!proof) return <Skeleton className="h-48" />;
 
   const single = proof.single_citizen_vs_expert;
   const crowd = proof.crowd_verified_vs_expert;
   const thin = Math.max(single.n, crowd.n) < 10;
+  const singlePct = single.exact !== null ? Math.round(single.exact * 100) : null;
+  const crowdPct = crowd.exact !== null ? Math.round(crowd.exact * 100) : null;
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm">
-      <h2 className="font-semibold">Does the game make the data better?</h2>
-      <p className="mt-1 text-sm text-muted">
-        Both lines are measured against expert scores, on the same answers.
-      </p>
+    <SolidCard className="space-y-4 p-5">
+      <h2 className="text-lg font-bold text-ink">Does the game make the data better?</h2>
+      <p className="text-sm text-muted">Both lines are measured against expert scores, on the same answers.</p>
 
-      <ul className="mt-3 space-y-3">
-        <Bar label="One citizen alone agreed with the expert" value={single.exact} n={single.n} tone="bg-sky-400" />
-        <Bar label="The crowd agreed with the expert" value={crowd.exact} n={crowd.n} tone="bg-brand-500" />
+      <div className="grid grid-cols-2 gap-3 text-center">
+        <div className="rounded-2xl bg-cloud p-3">
+          <p className="text-xs font-semibold text-muted">One citizen</p>
+          <p className="font-display text-4xl text-deep">{singlePct !== null ? <CountUp value={singlePct} suffix="%" /> : "—"}</p>
+        </div>
+        <div className="rounded-2xl bg-mint/20 p-3 ring-1 ring-mint/40">
+          <p className="text-xs font-semibold text-muted">Crowd verified</p>
+          <p className="font-display text-4xl text-deep">{crowdPct !== null ? <CountUp value={crowdPct} suffix="%" /> : "—"}</p>
+        </div>
+      </div>
+
+      <ul className="space-y-4">
+        <Bar label="One citizen alone agreed with the expert" value={single.exact} n={single.n} />
+        <Bar label="The crowd agreed with the expert" value={crowd.exact} n={crowd.n} />
       </ul>
 
       {proof.share_needed_expert !== null && (
-        <p className="mt-4 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">
-          <span className="text-lg font-bold">Only {Math.round(proof.share_needed_expert * 100)}%</span> of
-          observations needed an expert — {proof.counts.needed_expert} of {proof.counts.total_submitted}.
+        <motion.p
+          className="rounded-2xl bg-deep p-4 text-sm text-cloud"
+          initial={reduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          <span className="font-display text-3xl text-mint">
+            Only <CountUp value={Math.round(proof.share_needed_expert * 100)} suffix="%" />
+          </span>{" "}
+          of observations needed an expert — {proof.counts.needed_expert} of {proof.counts.total_submitted}.
           {proof.counts.crowd_verified > 0 && ` Guardians verified ${proof.counts.crowd_verified}.`}
-        </p>
+        </motion.p>
       )}
 
       {thin && (
-        <p className="mt-2 text-xs text-muted">
-          Early days: with this few expert-scored answers these percentages can swing a lot. They get meaningful as
-          more observations are reviewed.
+        <p className="text-xs text-muted">
+          Early days: with this few expert-scored answers these percentages can swing a lot. They get meaningful as more
+          observations are reviewed.
         </p>
       )}
-    </section>
+    </SolidCard>
   );
 }

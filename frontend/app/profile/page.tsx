@@ -4,17 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import AccuracyChart from "@/components/AccuracyChart";
 import AuthGuard from "@/components/AuthGuard";
+import SkillMapRow from "@/components/SkillMapRow";
+import Button from "@/components/ui/Button";
+import CountUp from "@/components/ui/CountUp";
+import LiquidProgress from "@/components/ui/LiquidProgress";
 import { api, friendlyMessage } from "@/lib/api";
-import type { Profile as ProfileData, Receipt, SkillRow } from "@/lib/types";
+import type { Profile as ProfileData, Receipt } from "@/lib/types";
 
 const PAGE = 10;
-
-const STANDING: Record<SkillRow["standing"], { label: string; bar: string; chip: string }> = {
-  strong: { label: "Strong", bar: "bg-brand-500", chip: "bg-brand-50 text-brand-700" },
-  ok: { label: "OK", bar: "bg-sky-400", chip: "bg-sky-50 text-sky-800" },
-  focus: { label: "Focus", bar: "bg-amber-400", chip: "bg-amber-50 text-amber-800" },
-  unknown: { label: "Not measured", bar: "bg-line", chip: "bg-slate-100 text-slate-600" },
-};
 
 function Profile() {
   const [data, setData] = useState<ProfileData | null>(null);
@@ -76,31 +73,31 @@ function Profile() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl bg-brand-600 p-5 text-white">
-        <p className="text-sm text-brand-50">{data.display_name ?? "You"}</p>
-        <h1 className="text-2xl font-semibold">{data.level.label}</h1>
-        <p className="mt-1 text-brand-50">
-            <span className="text-xl font-bold">{data.points.awarded}</span> points
-          {data.points.pending > 0 && <span className="text-sm"> · {data.points.pending} pending</span>}
-        </p>
+      <section className="relative overflow-hidden rounded-3xl hero-gradient p-5 text-cloud">
+        <div className="flex items-center gap-4">
+          <div className="relative grid h-[5.5rem] w-[5.5rem] place-items-center">
+            <LiquidProgress variant="circle" value={data.next_level?.percent ?? 40} size={88} className="absolute" />
+            <span className="text-lg font-bold text-white">{data.level.label.slice(0, 1)}</span>
+          </div>
+          <div>
+            <p className="text-sm text-mint/90">{data.display_name ?? "You"}</p>
+            <h1 className="font-display text-2xl text-white">{data.level.label}</h1>
+            <p className="mt-1 text-sm">
+              <CountUp value={data.points.awarded} className="text-xl font-bold" /> points
+              {data.points.pending > 0 && <span className="text-sand"> · {data.points.pending} pending</span>}
+            </p>
+          </div>
+        </div>
         {data.next_level && (
-          <div className="mt-3">
-            <div className="h-2 overflow-hidden rounded-full bg-brand-700">
-              <div
-                className="motion-safe:transition-all h-full rounded-full bg-white"
-                style={{ width: `${data.next_level.percent}%` }}
-              />
-            </div>
-            <p className="mt-1.5 text-sm text-brand-50">{data.next_level.summary}</p>
+          <div className="mt-4">
+            <LiquidProgress value={data.next_level.percent} className="bg-white/20" height={8} />
+            <p className="mt-1.5 text-sm text-cloud/90">{data.next_level.summary}</p>
           </div>
         )}
         {isExpert && (
-          <Link
-            href="/review"
-            className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-white px-4 text-sm font-semibold text-brand-700"
-          >
+          <Button href="/review" variant="secondary" className="mt-3 bg-white/90 text-deep">
             Expert review queue
-          </Link>
+          </Button>
         )}
       </section>
 
@@ -128,26 +125,9 @@ function Profile() {
         <h2 className="font-semibold">Your skill map</h2>
         <p className="mb-3 text-sm text-muted">Measured only on practice photos with a known expert answer.</p>
         <ul className="space-y-2.5">
-          {data.skill_map.map((row) => {
-            const s = STANDING[row.standing];
-            return (
-              <li key={row.indicator_id}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm">{row.label}</span>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${s.chip}`}>{s.label}</span>
-                </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface">
-                  <div
-                    className={`h-full rounded-full ${s.bar}`}
-                    style={{ width: `${Math.round((row.accuracy ?? 0) * 100)}%` }}
-                  />
-                </div>
-                <p className="mt-0.5 text-xs text-muted">
-                  {row.n === 0 ? "No practice photos yet" : `${Math.round((row.accuracy ?? 0) * 100)}% over ${row.n}`}
-                </p>
-              </li>
-            );
-          })}
+          {data.skill_map.map((row) => (
+            <SkillMapRow key={row.indicator_id} row={row} />
+          ))}
         </ul>
       </section>
 
@@ -202,18 +182,32 @@ function Profile() {
         )}
       </section>
 
-      <Link
-        href="/insights"
-        className="flex items-center justify-between rounded-2xl border border-line bg-white p-4 text-sm"
-      >
-        <span>
-          <span className="font-semibold">Does the game make the data better?</span>
-          <span className="mt-0.5 block text-muted">See how the crowd compares with experts.</span>
-        </span>
-        <span aria-hidden className="text-brand-700">
-          →
-        </span>
-      </Link>
+      <section className="rounded-3xl bg-white p-4 shadow-[0_12px_40px_-16px_rgba(11,31,38,0.12)]">
+        <h2 className="font-bold text-ink">More in StreamSaathi</h2>
+        <ul className="mt-3 grid gap-2 text-sm">
+          {[
+            { href: "/observations", label: "History", hint: "Past stream checks" },
+            { href: "/map", label: "Map", hint: "Where checks happened" },
+            { href: "/play/practice", label: "Practice photos", hint: "Learn the scale (XP only)" },
+            { href: "/calibrate", label: "Calibration", hint: "Training photos with feedback" },
+            { href: "/welcome", label: "Intro & practice round", hint: "How points and Spot Check work" },
+            { href: "/insights", label: "Proof panel", hint: "Does the game improve the data?" },
+          ].map((item) => (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="flex min-h-11 items-center justify-between gap-2 rounded-2xl bg-cloud px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua"
+              >
+                <span>
+                  <span className="font-semibold text-ink">{item.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{item.hint}</span>
+                </span>
+                <span className="shrink-0 text-aqua" aria-hidden>→</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

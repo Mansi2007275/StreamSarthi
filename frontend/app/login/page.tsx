@@ -2,10 +2,55 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Button from "@/components/ui/Button";
+import Wordmark from "@/components/ui/Wordmark";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/useSession";
+import { cn } from "@/lib/cn";
 
 type Mode = "password" | "magic";
+
+function FloatingInput({
+  id,
+  label,
+  type,
+  value,
+  onChange,
+  autoComplete,
+  minLength,
+}: {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+  minLength?: number;
+}) {
+  const filled = value.length > 0;
+  return (
+    <label className="relative block">
+      <span
+        className={cn(
+          "pointer-events-none absolute left-3 transition-colors text-muted",
+          filled ? "top-2 text-xs" : "top-1/2 -translate-y-1/2 text-sm",
+        )}
+      >
+        {label}
+      </span>
+      <input
+        id={id}
+        type={type}
+        required
+        autoComplete={autoComplete}
+        minLength={minLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-h-[3.25rem] w-full rounded-2xl border border-line bg-white px-3 pt-5 text-ink outline-none focus-visible:ring-2 focus-visible:ring-aqua"
+      />
+    </label>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -53,66 +98,58 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center p-4">
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand-500 text-2xl text-white">~</div>
-        <h1 className="text-2xl font-semibold">StreamSaathi</h1>
-        <p className="mt-1 text-sm text-muted">An AI second opinion for citizen stream assessment</p>
-      </div>
+    <main className="relative flex min-h-[100dvh] flex-col justify-center hero-gradient px-4 py-8">
+      {/* Form is plain HTML + CSS so it paints before Motion/ heavy JS — no opacity:0 entrance */}
+      <div className="relative z-[1] mx-auto w-full max-w-sm">
+        <div className="mb-6 text-center">
+          <Wordmark className="mx-auto h-8 w-40" light />
+          <p className="mt-2 text-sm text-cloud/90">An AI second opinion for citizen stream checks</p>
+        </div>
 
-      <div className="mb-4 grid grid-cols-2 rounded-xl bg-white p-1 text-sm shadow-sm">
-        {(["password", "magic"] as Mode[]).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`min-h-11 rounded-lg ${mode === m ? "bg-brand-600 font-medium text-white" : "text-muted"}`}
-          >
-            {m === "password" ? "Email + password" : "Magic link"}
-          </button>
-        ))}
-      </div>
+        <div className="mb-4 grid grid-cols-2 gap-1 rounded-3xl bg-white/90 p-1 text-sm shadow-glass">
+          {(["password", "magic"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={cn(
+                "min-h-11 rounded-2xl font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-aqua",
+                mode === m ? "bg-aqua text-white" : "text-ink/70",
+              )}
+            >
+              {m === "password" ? "Email + password" : "Magic link"}
+            </button>
+          ))}
+        </div>
 
-      <form onSubmit={onSubmit} className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-        <label className="block">
-          <span className="text-sm font-medium">Email</span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 min-h-12 w-full rounded-xl border border-line px-3 outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </label>
-        {mode === "password" && (
-          <label className="block">
-            <span className="text-sm font-medium">Password</span>
-            <input
+        <form onSubmit={onSubmit} className="space-y-3 rounded-3xl bg-white p-4 shadow-glass">
+          <FloatingInput id="email" label="Email" type="email" value={email} onChange={setEmail} autoComplete="email" />
+          {mode === "password" && (
+            <FloatingInput
+              id="password"
+              label="Password"
               type="password"
-              required
-              minLength={6}
-              autoComplete={isSignUp ? "new-password" : "current-password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 min-h-12 w-full rounded-xl border border-line px-3 outline-none focus:ring-2 focus:ring-brand-500"
+              onChange={setPassword}
+              autoComplete={isSignUp ? "new-password" : "current-password"}
+              minLength={6}
             />
-          </label>
-        )}
-        <button disabled={busy} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-60">
-          {busy ? "Please wait..." : mode === "magic" ? "Send magic link" : isSignUp ? "Create account" : "Log in"}
-        </button>
-        {mode === "password" && (
-          <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="min-h-11 w-full text-sm text-brand-700">
-            {isSignUp ? "Have an account? Log in" : "New here? Create an account"}
-          </button>
-        )}
-        {msg && (
-          <p className={`rounded-lg p-2 text-sm ${msg.kind === "ok" ? "bg-brand-50 text-brand-700" : "bg-red-50 text-red-700"}`}>
-            {msg.text}
-          </p>
-        )}
-      </form>
+          )}
+          <Button type="submit" disabled={busy} className="w-full">
+            {busy ? "Please wait..." : mode === "magic" ? "Send magic link" : isSignUp ? "Create account" : "Log in"}
+          </Button>
+          {mode === "password" && (
+            <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="min-h-11 w-full text-sm font-medium text-aqua">
+              {isSignUp ? "Have an account? Log in" : "New here? Create an account"}
+            </button>
+          )}
+          {msg && (
+            <p className={cn("rounded-2xl p-2 text-sm", msg.kind === "ok" ? "bg-mint/25 text-deep" : "bg-coral/20 text-deep")}>
+              {msg.text}
+            </p>
+          )}
+        </form>
+      </div>
     </main>
   );
 }

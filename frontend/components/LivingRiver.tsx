@@ -14,7 +14,7 @@ export default function LivingRiver({ river }: { river: River }) {
   const clear = has("clear_water");
 
   return (
-    <figure className="overflow-hidden rounded-2xl bg-brand-600">
+    <figure className="overflow-hidden rounded-3xl bg-deep">
       <svg
         viewBox="0 0 320 150"
         className="block w-full"

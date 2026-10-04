@@ -1,6 +1,8 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import type { Confidence } from "@/lib/types";
+import { cn } from "@/lib/cn";
 
 const OPTIONS: { value: Confidence; label: string }[] = [
   { value: "sure", label: "Sure" },
@@ -8,8 +10,6 @@ const OPTIONS: { value: Confidence; label: string }[] = [
   { value: "guess", label: "Guessing" },
 ];
 
-/** "How sure are you?" - stored with the vote so an uncertain answer can be weighted
- *  and, in a stream check, routed to an expert rather than silently trusted. */
 export default function ConfidencePicker({
   value,
   onChange,
@@ -19,10 +19,12 @@ export default function ConfidencePicker({
   onChange: (c: Confidence) => void;
   disabled?: boolean;
 }) {
+  const reduce = useReducedMotion();
+
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium">How sure are you?</p>
-      <div role="radiogroup" aria-label="How sure are you?" className="flex gap-2">
+      <p className="mb-1.5 text-sm font-semibold text-ink">How sure are you?</p>
+      <div role="radiogroup" aria-label="How sure are you?" className="relative flex gap-1 rounded-2xl bg-cloud p-1">
         {OPTIONS.map((o) => {
           const selected = value === o.value;
           return (
@@ -33,11 +35,19 @@ export default function ConfidencePicker({
               aria-checked={selected}
               disabled={disabled}
               onClick={() => onChange(o.value)}
-              className={`min-h-11 flex-1 rounded-xl border px-2 text-sm transition disabled:opacity-60 ${
-                selected ? "border-brand-600 bg-brand-50 font-semibold text-brand-700" : "border-line bg-white text-muted"
-              }`}
+              className={cn(
+                "relative min-h-11 flex-1 rounded-xl px-2 text-sm font-medium transition disabled:opacity-60",
+                selected ? "text-deep" : "text-muted",
+              )}
             >
-              {o.label}
+              {selected && !reduce && (
+                <motion.span
+                  layoutId="confidence-seg"
+                  className="absolute inset-0 rounded-xl bg-white shadow-sm ring-1 ring-line/80"
+                  transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                />
+              )}
+              <span className="relative z-[1]">{o.label}</span>
             </button>
           );
         })}

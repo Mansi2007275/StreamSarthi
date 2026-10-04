@@ -2,11 +2,23 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { Waves } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import DueBadge, { StreakMedal } from "@/components/DueBadge";
+import Button from "@/components/ui/Button";
+import DropletLoader from "@/components/ui/DropletLoader";
+import SolidCard from "@/components/ui/SolidCard";
+import StatusDot from "@/components/ui/StatusDot";
 import { useToast } from "@/components/Toast";
 import { api, friendlyMessage } from "@/lib/api";
 import type { MyStream as MyStreamData, NearestSite } from "@/lib/types";
+
+function healthFromLevel(level: string | null | undefined): "healthy" | "moderate" | "poor" {
+  if (level === "good") return "healthy";
+  if (level === "poor") return "poor";
+  return "moderate";
+}
 
 function getPosition(): Promise<{ lat: number; lng: number } | null> {
   return new Promise((resolve) => {
@@ -21,6 +33,7 @@ function getPosition(): Promise<{ lat: number; lng: number } | null> {
 
 function MyStream() {
   const toast = useToast();
+  const reduce = useReducedMotion();
   const [data, setData] = useState<MyStreamData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nearby, setNearby] = useState<NearestSite | null>(null);
@@ -67,122 +80,103 @@ function MyStream() {
 
   if (error) {
     return (
-      <div className="space-y-3 rounded-2xl bg-white p-5 text-center shadow-sm">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={load} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Try again
-        </button>
-      </div>
+      <SolidCard className="space-y-3 p-5 text-center">
+        <p className="text-sm text-coral">{error}</p>
+        <Button onClick={load} className="w-full">Try again</Button>
+      </SolidCard>
     );
   }
 
   if (!data) {
-    return (
-      <div className="space-y-3">
-        <div className="skeleton h-8 w-1/2" />
-        <div className="skeleton h-32" />
-        <div className="skeleton h-32" />
-      </div>
-    );
+    return <DropletLoader label="Loading your streams…" />;
   }
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">My Stream</h1>
-        <p className="text-sm text-muted">
-          Look after up to {data.max_sites} streams. One check a month is enough to build a trend.
+      <header className="relative overflow-hidden rounded-3xl hero-gradient px-4 py-4 text-cloud">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-mint/90">
+          <Waves className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+          My Stream
         </p>
-      </div>
+        <h1 className="font-display text-2xl text-white">Your adopted waters</h1>
+        <p className="mt-1 text-sm text-cloud/90">
+          Up to {data.max_sites} sites · one check a month builds the story.
+        </p>
+      </header>
 
-      {data.sites.map((s) => (
-        <article key={s.site_id} className="rounded-2xl bg-white p-4 shadow-sm">
-          <Link href={`/my-stream/${s.site_id}`} className="block">
-            <div className="flex items-start justify-between gap-2">
-              <h2 className="font-semibold">{s.name ?? `Stream at ${s.lat ?? "?"}, ${s.lng ?? "?"}`}</h2>
-              <DueBadge status={s.due_status} />
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              <StreakMedal months={s.streak_months} />
-              {s.one_health_level && (
-                <span className="rounded-full bg-surface px-2 py-0.5 text-xs capitalize text-muted">
-                  {s.one_health_level}
-                </span>
-              )}
-            </div>
-            <p className="mt-2 text-sm text-muted">
-              {s.last_check ? `Last checked ${new Date(s.last_check).toLocaleDateString()}` : "Not checked yet"}
-              {s.checks > 0 && ` · ${s.checks} check${s.checks === 1 ? "" : "s"} by you`}
-            </p>
-            {s.others_this_month > 0 && (
-              <p className="text-sm text-muted">
-                {s.others_this_month} other Guardian report{s.others_this_month === 1 ? "" : "s"} this month
+      {data.sites.map((s, i) => (
+        <motion.article
+          key={s.site_id}
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 360, damping: 28, delay: i * 0.06 }}
+        >
+          <SolidCard className="p-4">
+            <Link href={`/my-stream/${s.site_id}`} className="block">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <StatusDot status={healthFromLevel(s.one_health_level)} pulse={s.due_status === "due"} />
+                  <h2 className="font-bold text-ink">{s.name ?? `Stream at ${s.lat ?? "?"}, ${s.lng ?? "?"}`}</h2>
+                </div>
+                <DueBadge status={s.due_status} />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <StreakMedal months={s.streak_months} />
+                {s.one_health_level && (
+                  <span className="rounded-full bg-cloud px-2 py-0.5 text-xs capitalize text-muted">{s.one_health_level}</span>
+                )}
+              </div>
+              <p className="mt-2 text-sm text-muted">
+                {s.last_check ? `Last checked ${new Date(s.last_check).toLocaleDateString()}` : "Not checked yet"}
+                {s.checks > 0 && ` · ${s.checks} check${s.checks === 1 ? "" : "s"} by you`}
               </p>
-            )}
-          </Link>
-          <Link
-            href={`/assess?site=${s.site_id}`}
-            className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-600 font-semibold text-white"
-          >
-            Check now
-          </Link>
-        </article>
+              {s.others_this_month > 0 && (
+                <p className="text-sm text-muted">
+                  {s.others_this_month} other Guardian report{s.others_this_month === 1 ? "" : "s"} this month
+                </p>
+              )}
+            </Link>
+            <Button href={`/assess?site=${s.site_id}`} className="mt-3 w-full">Check now</Button>
+          </SolidCard>
+        </motion.article>
       ))}
 
       {data.sites.length === 0 && !nearby && (
-        <section className="space-y-3 rounded-2xl bg-white p-6 text-center shadow-sm">
-          <p className="text-4xl" aria-hidden>
-            🌊
+        <SolidCard className="space-y-3 p-6 text-center">
+          <h2 className="text-lg font-bold text-ink">Adopt a stream near you</h2>
+          <p className="text-sm text-muted">
+            Pick water close to home, check it once a month, and watch its story build up.
           </p>
-          <h2 className="text-lg font-semibold">Adopt a stream near you</h2>
-          <p className="text-muted">
-            Pick a stretch of water close to home, check it once a month, and watch its story build up.
-          </p>
-          <button
-            onClick={findNearby}
-            disabled={looking}
-            className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-60"
-          >
-            {looking ? "Looking..." : "Find streams near me"}
-          </button>
-        </section>
+          <Button onClick={findNearby} disabled={looking} className="w-full">
+            {looking ? "Looking…" : "Find streams near me"}
+          </Button>
+        </SolidCard>
       )}
 
       {nearby && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-semibold">Near you</h2>
+        <SolidCard className="space-y-2 p-4">
+          <h2 className="font-bold text-ink">Near you</h2>
           {nearby.site ? (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-surface p-3">
-              <span className="text-sm">
+            <div className="flex items-center justify-between gap-2 rounded-2xl bg-cloud p-3">
+              <span className="text-sm text-ink">
                 {nearby.site.name ?? "Unnamed stream"}
                 {nearby.distance_m !== null && (
                   <span className="block text-xs text-muted">about {Math.round(nearby.distance_m)} m away</span>
                 )}
               </span>
-              <button
-                onClick={() => adopt(nearby.site!.id)}
-                disabled={busy || !data.can_adopt_more}
-                className="min-h-11 shrink-0 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
-              >
+              <Button onClick={() => adopt(nearby.site!.id)} disabled={busy || !data.can_adopt_more} className="shrink-0">
                 Adopt
-              </button>
+              </Button>
             </div>
           ) : (
-            <div className="mt-2 rounded-xl bg-surface p-3 text-sm text-muted">
+            <div className="rounded-2xl bg-cloud p-3 text-sm text-muted">
               <p>No stream on record within {nearby.radius_m} m of you.</p>
               <p className="mt-1">Do a stream check first, then adopt that site.</p>
-              <Link
-                href="/assess"
-                className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white"
-              >
-                Check a stream
-              </Link>
+              <Button href="/assess" className="mt-2 w-full">Check a stream</Button>
             </div>
           )}
-          <button onClick={() => setNearby(null)} className="mt-2 min-h-11 w-full text-sm text-muted underline">
-            Close
-          </button>
-        </section>
+          <Button variant="ghost" onClick={() => setNearby(null)} className="w-full">Close</Button>
+        </SolidCard>
       )}
 
       {data.sites.length > 0 && (
@@ -194,13 +188,9 @@ function MyStream() {
       )}
 
       {data.sites.length > 0 && data.can_adopt_more && !nearby && (
-        <button
-          onClick={findNearby}
-          disabled={looking}
-          className="min-h-12 w-full rounded-xl border border-line font-medium disabled:opacity-60"
-        >
-          {looking ? "Looking..." : "Adopt another stream"}
-        </button>
+        <Button variant="secondary" onClick={findNearby} disabled={looking} className="w-full">
+          {looking ? "Looking…" : "Adopt another stream"}
+        </Button>
       )}
     </div>
   );

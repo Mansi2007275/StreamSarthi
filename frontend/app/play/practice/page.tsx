@@ -1,28 +1,31 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import AuthGuard from "@/components/AuthGuard";
 import PhotoQuestion from "@/components/PhotoQuestion";
+import PlayHeader from "@/components/PlayHeader";
+import PracticeReveal from "@/components/PracticeReveal";
+import Button from "@/components/ui/Button";
+import CardStack from "@/components/ui/CardStack";
+import CountUp from "@/components/ui/CountUp";
+import DropletLoader from "@/components/ui/DropletLoader";
+import EmptyState from "@/components/ui/EmptyState";
+import SolidCard from "@/components/ui/SolidCard";
 import { api, friendlyMessage } from "@/lib/api";
-import type { PlayItem, PracticeReveal } from "@/lib/types";
+import type { PlayItem, PracticeReveal as PracticeRevealData } from "@/lib/types";
 
-/** Replay mode. Photos you have already judged come back so you can keep learning the
- *  scale after the first-vote pool runs dry.
- *
- *  Replays pay XP and nothing else. They never touch points, your vote record, your skill
- *  weight or any consensus - otherwise replaying a photo whose answer you have been shown
- *  would be a way to buy voting power. */
 function Practice() {
   const [items, setItems] = useState<PlayItem[] | null>(null);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState<number | null>(null);
-  const [reveal, setReveal] = useState<PracticeReveal | null>(null);
+  const [reveal, setReveal] = useState<PracticeRevealData | null>(null);
   const [xp, setXp] = useState(0);
   const [matched, setMatched] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const reduce = useReducedMotion();
 
   const fetchRound = useCallback(() => {
     api
@@ -49,69 +52,51 @@ function Practice() {
 
   if (error) {
     return (
-      <div className="space-y-3 rounded-2xl bg-white p-5 text-center shadow-sm">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={restart} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Try again
-        </button>
-        <Link href="/play" className="block min-h-11 pt-3 text-sm text-muted underline">
-          Back to Spot Check
-        </Link>
-      </div>
+      <SolidCard className="space-y-3 p-5 text-center">
+        <p className="text-sm text-coral">{error}</p>
+        <Button onClick={restart} className="w-full">Try again</Button>
+        <Button href="/play" variant="ghost" className="w-full">Back to Spot Check</Button>
+      </SolidCard>
     );
   }
 
   if (!items) {
-    return (
-      <div className="space-y-3">
-        <div className="skeleton h-4 w-1/3" />
-        <div className="skeleton h-7 w-2/3" />
-        <div className="skeleton aspect-[4/3] w-full" />
-        <div className="skeleton h-40" />
-      </div>
-    );
+    return <DropletLoader label="Loading practice photos…" />;
   }
 
   if (items.length === 0) {
     return (
-      <div className="space-y-4 rounded-2xl bg-white p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold">No practice photos yet</h1>
-        <p className="text-muted">
-          An expert has not added any practice photos to this stream network. Checking a real stream is the most useful
-          thing you can do right now.
-        </p>
-        <Link
-          href="/assess"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-brand-600 px-5 font-semibold text-white"
-        >
-          Check a real stream
-        </Link>
-        <Link href="/" className="block min-h-11 pt-3 text-sm text-muted underline">
-          Back home
-        </Link>
-      </div>
+      <EmptyState
+        title="No practice photos yet"
+        description="An expert has not added practice photos yet. Checking a real stream is the most useful thing you can do right now."
+        actionHref="/assess"
+        actionLabel="Check a real stream"
+      >
+        <Button href="/" variant="ghost" className="mt-3 w-full">Back home</Button>
+      </EmptyState>
     );
   }
 
   if (done) {
     return (
-      <div className="space-y-4 rounded-2xl bg-white p-6 text-center shadow-sm">
-        <h1 className="text-xl font-semibold">Practice done</h1>
-        <p className="pop-in text-4xl font-bold text-brand-700">+{xp} XP</p>
-        <p className="text-muted">
-          You matched the expert on {matched} of {items.length}.
-        </p>
-        <p className="text-sm text-muted">
-          Practice XP tracks your learning. It does not change your points or how much your real votes count — those come
-          only from first-time checks.
-        </p>
-        <button onClick={restart} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Practise again
-        </button>
-        <Link href="/play" className="block min-h-11 rounded-xl border border-line pt-3 font-medium">
-          Back to Spot Check
-        </Link>
-      </div>
+      <motion.div
+        initial={reduce ? false : { opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+      >
+        <SolidCard className="space-y-4 p-6 text-center">
+          <h1 className="font-display text-2xl text-deep">Practice done</h1>
+          <p className="font-display text-5xl text-aqua">+<CountUp value={xp} /> XP</p>
+          <p className="text-muted">
+            You matched the expert on <strong>{matched}</strong> of {items.length}.
+          </p>
+          <p className="text-sm text-muted">
+            Practice XP is for learning only — it does not change your points or vote weight.
+          </p>
+          <Button onClick={restart} className="w-full">Practise again</Button>
+          <Button href="/play" variant="secondary" className="w-full">Back to Spot Check</Button>
+        </SolidCard>
+      </motion.div>
     );
   }
 
@@ -145,69 +130,48 @@ function Practice() {
     setError(null);
   }
 
-  const tone = reveal?.matched
-    ? { border: "border-brand-200 bg-brand-50", text: "text-brand-700", title: "Spot on!" }
-    : reveal?.close
-      ? { border: "border-amber-200 bg-amber-50", text: "text-amber-800", title: "Very close" }
-      : { border: "border-sky-200 bg-sky-50", text: "text-sky-800", title: "Worth a look" };
-
   return (
     <div className="space-y-4">
-      <p className="rounded-xl bg-surface p-2 text-center text-xs text-muted">
-        Practice mode · XP only, your points and skill are untouched
-      </p>
-
-      <PhotoQuestion
-        label={item.indicator.label}
-        help={item.indicator.help?.en}
-        imageUrl={item.image_url}
-        scale={item.indicator.scale}
-        scaleLabels={item.indicator.scale_labels}
-        score={score}
-        onScore={setScore}
-        disabled={reveal !== null || busy}
+      <PlayHeader
+        title="Practice mode"
+        subtitle="XP only — same photos, zero impact on real votes."
         step={index + 1}
         total={items.length}
+        badge={xp > 0 ? `${xp} XP` : undefined}
       />
 
+      <CardStack cardKey={item.id}>
+        <PhotoQuestion
+          label={item.indicator.label}
+          help={item.indicator.help?.en}
+          imageUrl={item.image_url}
+          scale={item.indicator.scale}
+          scaleLabels={item.indicator.scale_labels}
+          score={score}
+          onScore={setScore}
+          disabled={reveal !== null || busy}
+          step={index + 1}
+          total={items.length}
+          hideProgress
+        />
+      </CardStack>
+
       {error && (
-        <div className="rounded-xl bg-red-50 p-3">
-          <p className="text-sm text-red-700">{error}</p>
-          <button
-            onClick={next}
-            className="mt-2 min-h-11 w-full rounded-xl border border-red-200 bg-white text-sm font-medium"
-          >
+        <SolidCard className="space-y-2 p-4">
+          <p className="text-sm text-coral">{error}</p>
+          <Button variant="secondary" onClick={next} className="w-full">
             {isLast ? "Skip and finish" : "Skip this photo"}
-          </button>
-        </div>
+          </Button>
+        </SolidCard>
       )}
 
       {!reveal && (
-        <button
-          onClick={check}
-          disabled={score === null || busy}
-          className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Checking..." : "Check my answer"}
-        </button>
+        <Button onClick={check} disabled={score === null || busy} className="w-full">
+          {busy ? "Checking…" : "Check my answer"}
+        </Button>
       )}
 
-      {reveal && (
-        <div className={`pop-in rounded-2xl border p-4 ${tone.border}`} role="status" aria-live="polite">
-          <p className={`font-semibold ${tone.text}`}>
-            {tone.title}
-            <span className="ml-2 text-sm font-normal">+{reveal.xp_awarded} XP</span>
-          </p>
-          <p className="mt-1 text-sm">
-            The expert said <strong>{reveal.expert_score}</strong>
-            {reveal.expert_label ? ` — ${reveal.expert_label}` : ""}.
-          </p>
-          <p className="mt-1 text-sm text-muted">{reveal.explanation}</p>
-          <button onClick={next} className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-            {isLast ? "See my practice" : "Next photo"}
-          </button>
-        </div>
-      )}
+      {reveal && <PracticeReveal reveal={reveal} onNext={next} isLast={isLast} />}
     </div>
   );
 }
