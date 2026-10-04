@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamSaathi QR Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #04293a 0%, #0b3d52 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 16px 48px -12px rgba(4, 41, 58, 0.18);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #7cf5c9;
+            font-size: 2.5rem;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+        }
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        button {
+            background: #00c2c7;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        .qr-container {
+            text-align: center;
+            margin-top: 30px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            color: #04293a;
+        }
+        .qr-url {
+            font-size: 12px;
+            color: #666;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        .warning {
+            background: rgba(255, 232, 182, 0.2);
+            border: 2px solid #ffe8b6;
+            color: #ffe8b6;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .download-btn {
+            background: #7cf5c9;
+            color: #04293a;
+            margin-top: 15px;
+            width: auto;
+            display: inline-block;
+        }
+        .preset-btn {
+            background: rgba(124, 245, 201, 0.2);
+            border: 2px solid #7cf5c9;
+            color: #7cf5c9;
+            margin: 5px;
+            width: auto;
+            display: inline-block;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 StreamSaathi QR Generator</h1>
+        
+        <div class="input-group">
+            <label for="baseUrl">Base URL:</label>
+            <input type="text" id="baseUrl" value="http://localhost:3001" placeholder="https://streamaathi.com">
+        </div>
+        
+        <div class="input-group">
+            <label for="siteId">Site ID:</label>
+            <input type="text" id="siteId" placeholder="Enter your site ID (e.g., site-123)">
+        </div>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <p style="font-size: 14px; opacity: 0.8;">Quick presets:</p>
+            <button class="preset-btn" onclick="setPreset('demo-site-1')">Demo Site 1</button>
+            <button class="preset-btn" onclick="setPreset('demo-site-2')">Demo Site 2</button>
+            <button class="preset-btn" onclick="setPreset('test-station')">Test Station</button>
+        </div>
+        
+        <button onclick="generateQR()">🔄 Generate QR Code</button>
+        
+        <div id="warning" class="warning" style="display: none;">
+            <strong>⚠️ Warning:</strong> This QR points to localhost - only works on your local network. Use your live site URL for production posters.
+        </div>
+        
+        <div id="qrResult" class="qr-container" style="display: none;">
+            <h3>Your StreamSaathi Station QR Code</h3>
+            <canvas id="qrCanvas"></canvas>
+            <div class="qr-url" id="qrUrl"></div>
+            <button class="download-btn" onclick="downloadQR()">� Download QR Code</button>
+            <button class="download-btn" onclick="printQR()" style="margin-left: 10px;">🖨️ Print</button>
+        </div>
+    </div>
+
+    <script>
+        function setPreset(siteId) {
+            document.getElementById('siteId').value = siteId;
+        }
+
+        function generateQR() {
+            const baseUrl = document.getElementById('baseUrl').value;
+            const siteId = document.getElementById('siteId').value;
+            
+            if (!siteId) {
+                alert('Please enter a Site ID');
+                return;
+            }
+            
+            const url = `${baseUrl}/s/${siteId}`;
+            const canvas = document.getElementById('qrCanvas');
+            const resultDiv = document.getElementById('qrResult');
+            const warningDiv = document.getElementById('warning');
+            const urlDiv = document.getElementById('qrUrl');
+            
+            // Show warning for localhost
+            if (baseUrl.includes('localhost')) {
+                warningDiv.style.display = 'block';
+            } else {
+                warningDiv.style.display = 'none';
+            }
+            
+            // Generate QR code
+            QRCode.toCanvas(canvas, url, {
+                errorCorrectionLevel: 'H',
+                type: 'image/png',
+                quality: 0.92,
+                margin: 1,
+                width: 400,
+                color: {
+                    dark: '#04293a',
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) {
+                    console.error(error);
+                    alert('Error generating QR code');
+                } else {
+                    resultDiv.style.display = 'block';
+                    urlDiv.textContent = url;
+                    console.log('QR code generated successfully!');
+                }
+            });
+        }
+        
+        function downloadQR() {
+            const canvas = document.getElementById('qrCanvas');
+            const siteId = document.getElementById('siteId').value;
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = `streamaathi-station-${siteId}-qr.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        function printQR() {
+            const canvas = document.getElementById('qrCanvas');
+            const siteId = document.getElementById('siteId').value;
+            const url = document.getElementById('qrUrl').textContent;
+            
+            // Create print window with poster-like layout
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>StreamSaathi Station ${siteId} - QR Poster</title>
+                    <style>
+                        @page { size: A4 portrait; margin: 20mm; }
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            text-align: center; 
+                            margin: 0; 
+                            padding: 40px; 
+                            background: white; 
+                            color: #04293a; 
+                        }
+                        h1 { color: #04293a; font-size: 2.5em; margin-bottom: 10px; }
+                        .subtitle { color: #00c2c7; font-size: 1.2em; margin-bottom: 30px; }
+                        .qr-code { margin: 40px 0; }
+                        .instructions { font-size: 1.3em; margin: 30px 0; font-weight: bold; }
+                        .url { font-size: 10px; color: #666; word-break: break-all; margin-top: 20px; }
+                        .features { display: flex; justify-content: center; gap: 40px; margin: 30px 0; }
+                        .feature { text-align: center; }
+                        .feature-icon { width: 60px; height: 60px; margin-bottom: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <h1>StreamSaathi Station</h1>
+                    <div class="subtitle">Site: ${siteId}</div>
+                    
+                    <div class="qr-code">
+                        <img src="${canvas.toDataURL()}" style="width: 300px; height: 300px;">
+                    </div>
+                    
+                    <div class="instructions">
+                        📱 Scan, check this stream in 2 minutes
+                    </div>
+                    <div style="color: #666; font-size: 1em;">No app to install. Your phone camera is enough.</div>
+                    
+                    <div class="features">
+                        <div class="feature">
+                            <div style="font-size: 2em;">💧</div>
+                            <div>The water</div>
+                        </div>
+                        <div class="feature">
+                            <div style="font-size: 2em;">🏞️</div>
+                            <div>The banks</div>
+                        </div>
+                        <div class="feature">
+                            <div style="font-size: 2em;">🗑️</div>
+                            <div>Any rubbish</div>
+                        </div>
+                    </div>
+                    
+                    <div class="url">${url}</div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
+        }
+    </script>
+</body>
+</html>

@@ -64,9 +64,16 @@ export function friendlyMessage(e: unknown): string {
 type Options = { method?: string; json?: unknown; form?: FormData };
 
 async function request<T>(path: string, opts: Options = {}): Promise<T> {
-  const { data } = await supabase.auth.getSession();
   const headers: Record<string, string> = {};
-  if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
+  
+  // First try to get real Supabase session
+  const { data } = await supabase.auth.getSession();
+  if (data.session) {
+    headers.Authorization = `Bearer ${data.session.access_token}`;
+  } else {
+    // Fallback to demo token for demo mode
+    headers.Authorization = "Bearer demo-token";
+  }
 
   let body: BodyInit | undefined;
   if (opts.form) body = opts.form; // browser sets multipart boundary

@@ -18,7 +18,7 @@ import SolidCard from "@/components/ui/SolidCard";
 import { ApiError, api, friendlyMessage } from "@/lib/api";
 import type { Confidence, GoldReveal as GoldRevealData, PlayItem, VoteAck } from "@/lib/types";
 
-type Summary = { judged: number; goldSeen: number; goldMatched: number; points: number };
+type Summary = { judged: number; goldSeen: number; goldMatched: number; points: number; bestCombo: number };
 
 function Play() {
   const [items, setItems] = useState<PlayItem[] | null>(null);
@@ -29,7 +29,8 @@ function Play() {
   const [ack, setAck] = useState<VoteAck | null>(null);
   const [alreadyDone, setAlreadyDone] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [tally, setTally] = useState<Summary>({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0 });
+  const [tally, setTally] = useState<Summary>({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0, bestCombo: 0 });
+  const [combo, setCombo] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const reduce = useReducedMotion();
@@ -54,7 +55,8 @@ function Play() {
     setReveal(null);
     setAck(null);
     setSummary(null);
-    setTally({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0 });
+    setCombo(0);
+    setTally({ judged: 0, goldSeen: 0, goldMatched: 0, points: 0, bestCombo: 0 });
     fetchRound();
   }, [fetchRound]);
 
@@ -94,6 +96,7 @@ function Play() {
         judged={summary.judged}
         goldMatched={summary.goldMatched}
         goldSeen={summary.goldSeen}
+        bestCombo={summary.bestCombo}
         onPlayAgain={loadRound}
       />
     );
@@ -109,12 +112,17 @@ function Play() {
     setError(null);
     try {
       const result = await api.playVote(item.item_type, item.id, score, confidence);
+      const isGoldMatch = result.status === "revealed" && result.matched;
+      const newCombo = isGoldMatch ? combo + 1 : 0;
+      
       setTally((t) => ({
         judged: t.judged + 1,
         goldSeen: t.goldSeen + (result.status === "revealed" ? 1 : 0),
-        goldMatched: t.goldMatched + (result.status === "revealed" && result.matched ? 1 : 0),
+        goldMatched: t.goldMatched + (isGoldMatch ? 1 : 0),
         points: t.points + (result.status === "revealed" ? result.points_awarded : 0),
+        bestCombo: Math.max(t.bestCombo, newCombo),
       }));
+      setCombo(newCombo);
       if (result.status === "revealed") setReveal(result);
       else setAck(result);
     } catch (e) {
@@ -150,6 +158,7 @@ function Play() {
         step={index + 1}
         total={items.length}
         badge={tally.points > 0 ? `+${tally.points} pts` : undefined}
+        combo={combo}
       />
 
       <CardStack cardKey={item.id}>

@@ -26,6 +26,8 @@ function Poster() {
       ? `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/s/${siteId}`
       : `/s/${siteId}`;
 
+  const isLocalhost = typeof window !== "undefined" && window.location.origin.includes("localhost");
+
   /** Fetch only. State is set in the promise callbacks, never synchronously in an effect. */
   const fetchStation = useCallback(() => {
     api.station(siteId).then(setData).catch((e) => setError(friendlyMessage(e)));
@@ -76,6 +78,12 @@ function Poster() {
         <p className="mt-1 text-sm text-muted">
           Print it on A4, laminate it if you can, and fix it where people already stop.
         </p>
+        {isLocalhost && (
+          <div className="mt-3 rounded-lg bg-amber-50 p-3 border border-amber-200">
+            <p className="font-semibold text-amber-900 text-sm">⚠️ This QR points to localhost</p>
+            <p className="text-xs text-amber-800 mt-1">Open the poster from the live site before printing.</p>
+          </div>
+        )}
         <button
           onClick={() => window.print()}
           className="mt-3 min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white"
@@ -92,6 +100,13 @@ function Poster() {
         </div>
 
         <h2 className="text-2xl font-semibold">{data.name ?? "This stream"}</h2>
+
+        {isLocalhost && (
+          <div className="rounded-lg bg-amber-50 p-3 border border-amber-200 text-center">
+            <p className="font-semibold text-amber-900 text-sm">This QR points to localhost</p>
+            <p className="text-xs text-amber-800">Open from the live site before printing</p>
+          </div>
+        )}
 
         {qr ? (
           // eslint-disable-next-line @next/next/no-img-element -- a generated data: URI, nothing for next/image to optimise

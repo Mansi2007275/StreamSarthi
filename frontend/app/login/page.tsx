@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Wordmark from "@/components/ui/Wordmark";
 import { supabase } from "@/lib/supabase";
@@ -54,6 +54,7 @@ function FloatingInput({
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const session = useSession();
   const [mode, setMode] = useState<Mode>("password");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -62,9 +63,17 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
+  // Store next parameter from URL, validate it's relative
+  const nextParam = searchParams.get("next");
+  const nextUrl = nextParam && nextParam.startsWith("/") ? nextParam : null;
+
   useEffect(() => {
-    if (session) router.replace("/");
-  }, [session, router]);
+    if (session) {
+      // Redirect to `next` parameter if provided, otherwise home
+      const redirectTo = nextUrl || "/";
+      router.replace(redirectTo);
+    }
+  }, [session, router, nextUrl]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,17 +81,23 @@ export default function LoginPage() {
     setMsg(null);
     try {
       if (mode === "magic") {
+        const callbackUrl = nextUrl
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
+          : `${window.location.origin}/auth/callback`;
         const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { emailRedirectTo: callbackUrl },
         });
         if (error) throw error;
         setMsg({ kind: "ok", text: "Check your email for the login link." });
       } else if (isSignUp) {
+        const callbackUrl = nextUrl
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
+          : `${window.location.origin}/auth/callback`;
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { emailRedirectTo: callbackUrl },
         });
         if (error) throw error;
         if (!data.session) setMsg({ kind: "ok", text: "Account created. Confirm your email, then log in." });

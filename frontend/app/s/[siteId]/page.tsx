@@ -34,18 +34,55 @@ function StationPage() {
   const session = useSession();
   const [data, setData] = useState<Station | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   const load = useCallback(() => {
-    api.station(siteId).then(setData).catch((e) => setError(friendlyMessage(e)));
-  }, [siteId]);
+    setLoading(true);
+    const timeout = setTimeout(() => {
+      if (!data) {
+        setError("Waking up the server...");
+      }
+    }, 5000);
+
+    api
+      .station(siteId)
+      .then((station) => {
+        clearTimeout(timeout);
+        setData(station);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((e) => {
+        clearTimeout(timeout);
+        if (retryCount < 3) {
+          setError(`Waking up the server... (retry ${retryCount + 1}/3)`);
+        } else {
+          setError(friendlyMessage(e));
+        }
+        setLoading(false);
+      });
+  }, [siteId, retryCount, data]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Logged in -> straight to the check, tagged as coming from the poster.
-  // Logged out -> login first, then back here.
-  const checkHref = session ? `/assess?site=${siteId}&source=station` : `/login?next=/s/${siteId}`;
+  // Auto-retry every 10 seconds if server is waking up
+  useEffect(() => {
+    if (error && error.includes("Waking up") && retryCount < 3) {
+      const timer = setTimeout(() => {
+        setRetryCount((prev) => prev + 1);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, retryCount]);
+
+  // Logged in -> straight to the check with site preselected
+  // Logged out -> login first with redirect back to assess
+  const checkHref = session
+    ? `/assess?site=${siteId}`
+    : `/login?next=/assess?site=${siteId}`;
 
   return (
     <main className="mx-auto w-full max-w-xl space-y-5 p-4">

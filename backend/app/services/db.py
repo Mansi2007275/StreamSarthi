@@ -97,6 +97,10 @@ class SupabaseRepo:
         self.db = client
 
     def ensure_profile(self, user_id: str, email: str | None) -> None:
+        # Demo mode: skip database writes for demo users
+        if user_id == "12345678-1234-1234-1234-123456789012":
+            return
+        
         # Trigger normally creates it; this is a safety net (ignore if exists).
         display = (email or "user").split("@")[0]
         self.db.table("profiles").upsert(

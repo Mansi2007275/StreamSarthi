@@ -48,7 +48,14 @@ def get_current_user(
 ) -> CurrentUser:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AppError(401, "UNAUTHORIZED", "Missing Bearer token")
-    claims = decode_token(authorization.split(" ", 1)[1].strip(), settings)
+    
+    token = authorization.split(" ", 1)[1].strip()
+    
+    # Demo mode: accept demo-token with a valid UUID
+    if token == "demo-token":
+        return CurrentUser(id="12345678-1234-1234-1234-123456789012", email="demo@streamaaathi.local")
+    
+    claims = decode_token(token, settings)
     sub = claims.get("sub")
     if not sub:
         raise AppError(401, "UNAUTHORIZED", "Token has no subject")

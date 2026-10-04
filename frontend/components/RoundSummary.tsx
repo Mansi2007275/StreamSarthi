@@ -11,12 +11,14 @@ export default function RoundSummary({
   judged,
   goldMatched,
   goldSeen,
+  bestCombo,
   onPlayAgain,
 }: {
   points: number;
   judged: number;
   goldMatched: number;
   goldSeen: number;
+  bestCombo?: number;
   onPlayAgain: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -48,6 +50,14 @@ export default function RoundSummary({
               {goldSeen ? `${goldMatched}/${goldSeen}` : "—"}
             </dd>
           </div>
+          {bestCombo && bestCombo > 1 && (
+            <div className="rounded-2xl bg-sand/30 p-3">
+              <dt className="text-muted">Best combo</dt>
+              <dd className="text-lg font-bold text-deep">
+                🔥 <CountUp value={bestCombo} />
+              </dd>
+            </div>
+          )}
         </dl>
         <p className="text-sm text-muted">
           Your votes on real photos count once enough Guardians agree. You&apos;ll get a receipt when they do.

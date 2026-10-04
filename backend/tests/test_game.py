@@ -235,7 +235,7 @@ def test_new_player_gets_gold_only():
     assert {i["item_type"] for i in items} == {"gold"}
 
 
-def test_experienced_player_gets_one_gold_per_gold_every():
+def test_experienced_player_gets_one_gold_per_round():
     stats = {"user_id": "me", "gold_votes": CFG["new_player_gold_only_until"]}
     items = pick_round(
         stats,
@@ -245,7 +245,7 @@ def test_experienced_player_gets_one_gold_per_gold_every():
         rng=random.Random(7),
     )
     assert len(items) == CFG["round_size"]
-    assert sum(1 for i in items if i["item_type"] == "gold") == CFG["round_size"] // CFG["gold_every"]
+    assert sum(1 for i in items if i["item_type"] == "gold") == 1
 
 
 def test_gold_position_is_not_fixed_across_rounds():

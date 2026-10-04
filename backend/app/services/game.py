@@ -233,10 +233,13 @@ def pick_round(
     if user_stats.get("gold_votes", 0) < cfg["new_player_gold_only_until"]:
         return [gold_item(g) for g in gold_pool[:size]]
 
-    gold_count = min(size // cfg["gold_every"], len(gold_pool))
-    answers = eligible_candidates(user_stats, candidate_answers, cfg)[: size - gold_count]
+    # Experienced players: exactly 1 hidden gold per round, rest are real community observations
+    gold_count = min(1, len(gold_pool))  # Always 1 if available
+    real_count = size - gold_count
+    answers = eligible_candidates(user_stats, candidate_answers, cfg)[:real_count]
 
     items = [_answer_item(a) for a in answers]
+    # Insert the 1 gold item at a random position so it's not predictable
     for g in gold_pool[:gold_count]:
         items.insert(rng.randint(0, len(items)), gold_item(g))
     return items[:size]
