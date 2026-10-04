@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/useSession";
 import BottomTabBar from "./BottomTabBar";
 import NavBar from "./NavBar";
+import PageTransition from "@/components/ui/PageTransition";
+import Skeleton from "@/components/ui/Skeleton";
 
 /** Wrap any page that needs login. Redirects to /login when logged out. */
 export default function AuthGuard({ children }: { children: ReactNode }) {
@@ -18,8 +20,8 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   if (!session) {
     return (
       <div className="mx-auto w-full max-w-xl space-y-3 p-4">
-        <div className="skeleton h-12" />
-        <div className="skeleton h-40" />
+        <Skeleton className="h-12" />
+        <Skeleton className="h-40" />
       </div>
     );
   }
@@ -27,9 +29,9 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
   return (
     <>
       <NavBar email={session.user.email ?? ""} />
-      {/* pb-28 clears the mobile tab bar; a fixed bar would otherwise sit on top of the
-          last element of every page. */}
-      <main className="mx-auto w-full max-w-xl flex-1 p-4 pb-28 md:pb-24">{children}</main>
+      <main className="mx-auto w-full max-w-xl flex-1 p-4 pb-28 md:pb-24">
+        <PageTransition>{children}</PageTransition>
+      </main>
       <BottomTabBar />
     </>
   );

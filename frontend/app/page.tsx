@@ -1,9 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { Sparkles, MapPin, BookOpen, Receipt } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import LivingRiver from "@/components/LivingRiver";
+import BentoTile from "@/components/ui/BentoTile";
+import Button from "@/components/ui/Button";
+import CausticsLayer from "@/components/ui/CausticsLayer";
+import Chip from "@/components/ui/Chip";
+import CountUp from "@/components/ui/CountUp";
+import LiquidProgress from "@/components/ui/LiquidProgress";
+import Skeleton from "@/components/ui/Skeleton";
+import SolidCard from "@/components/ui/SolidCard";
 import { api, friendlyMessage } from "@/lib/api";
 import type { Home as HomeData } from "@/lib/types";
 
@@ -14,7 +22,7 @@ function readSeenStage(): number | null {
     const raw = window.localStorage.getItem(RIVER_SEEN_KEY);
     return raw === null ? null : Number(raw);
   } catch {
-    return null; // private window, or site data blocked
+    return null;
   }
 }
 
@@ -22,8 +30,13 @@ function writeSeenStage(stage: number): void {
   try {
     window.localStorage.setItem(RIVER_SEEN_KEY, String(stage));
   } catch {
-    // Not worth telling anybody about: they just see the banner once more next time.
+    /* ignore */
   }
+}
+
+function levelProgress(data: HomeData): number {
+  if (data.quest?.percent) return data.quest.percent;
+  return Math.min(100, (data.level.index + 1) * 18);
 }
 
 function Dashboard() {
@@ -37,7 +50,6 @@ function Dashboard() {
       .home()
       .then((home) => {
         setData(home);
-        // Celebrate a stage once, on the first Home visit after it was reached.
         if (home.river) {
           const seen = readSeenStage();
           if (seen !== null && home.river.stage_index > seen) {
@@ -54,179 +66,211 @@ function Dashboard() {
   }, [load]);
 
   async function markSeen(id: string) {
-    setDismissed((d) => [...d, id]); // optimistic: the card goes at once
+    setDismissed((d) => [...d, id]);
     try {
       await api.markReceiptSeen(id);
     } catch {
-      setDismissed((d) => d.filter((x) => x !== id)); // put it back if the server disagreed
+      setDismissed((d) => d.filter((x) => x !== id));
     }
   }
 
   if (error) {
     return (
-      <div className="space-y-3 rounded-2xl bg-white p-5 text-center shadow-sm">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={load} className="min-h-12 w-full rounded-xl bg-brand-600 font-semibold text-white">
-          Try again
-        </button>
-      </div>
+      <SolidCard className="space-y-3 p-5 text-center">
+        <p className="text-sm text-coral">{error}</p>
+        <Button onClick={load} className="w-full">Try again</Button>
+      </SolidCard>
     );
   }
 
   if (!data) {
     return (
       <div className="space-y-3">
-        <div className="skeleton h-24" />
-        <div className="skeleton h-28" />
-        <div className="skeleton h-28" />
+        <Skeleton className="h-36" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="col-span-2 h-28" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
       </div>
     );
   }
 
   const receipts = data.receipts.filter((r) => !dismissed.includes(r.id));
+  const progress = levelProgress(data);
 
   return (
     <div className="space-y-4">
-      {data.river && <LivingRiver river={data.river} />}
+      <section className="relative overflow-hidden rounded-3xl hero-gradient px-5 pb-5 pt-6 text-cloud shadow-glass">
+        <CausticsLayer />
+        <div className="relative">
+          <p className="text-sm text-mint/90">Hello {data.display_name ?? "there"}</p>
+          <h1 className="font-display text-[1.75rem] leading-tight text-white">{data.level.label}</h1>
+          <svg className="mt-2 h-2 w-24" viewBox="0 0 96 8" aria-hidden>
+            <path
+              className="river-flow"
+              d="M0 4 Q12 0 24 4 T48 4 T72 4 T96 4"
+              fill="none"
+              stroke="#7CF5C9"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          <p className="mt-3 text-sm text-cloud/90">
+            <CountUp value={data.points.awarded} className="text-2xl font-bold text-white" />
+            <span className="ml-1 font-medium">points</span>
+            {data.points.pending > 0 && (
+              <span className="ml-2 text-sm text-sand">· {data.points.pending} pending</span>
+            )}
+          </p>
+          <div className="mt-3">
+            <LiquidProgress value={progress} className="bg-white/20" height={8} />
+          </div>
+        </div>
+      </section>
 
       {grewTo && (
-        <div
-          className="pop-in rounded-2xl border border-brand-200 bg-brand-50 p-4 text-center"
-          role="status"
-          aria-live="polite"
-        >
-          <p className="text-2xl" aria-hidden>
-            🎉
-          </p>
-          <p className="mt-1 font-semibold text-brand-800">Your river grew: {grewTo}</p>
-          <p className="mt-1 text-sm text-brand-900">That came from work other people confirmed.</p>
-          <button
-            onClick={() => setGrewTo(null)}
-            className="mt-2 min-h-11 w-full rounded-xl bg-white text-sm font-medium text-brand-700"
-          >
-            Lovely
-          </button>
+        <div className="pop-in space-y-2 rounded-3xl border border-line/80 bg-white p-4 text-center shadow-[0_12px_40px_-16px_rgba(11,31,38,0.12)]" role="status" aria-live="polite">
+          <Chip tone="mint">River milestone</Chip>
+          <p className="font-semibold text-ink">Your river grew: {grewTo}</p>
+          <p className="text-sm text-muted">That came from work other people confirmed.</p>
+          <Button variant="secondary" onClick={() => setGrewTo(null)} className="w-full">Lovely</Button>
         </div>
       )}
 
-      <section className="rounded-2xl bg-brand-600 p-5 text-white">
-        <p className="text-sm text-brand-50">Hello {data.display_name ?? "there"}</p>
-        <h1 className="text-2xl font-semibold">{data.level.label}</h1>
-        <p className="mt-1 text-brand-50">
-          <span className="text-xl font-bold">{data.points.awarded}</span> points
-          {data.points.pending > 0 && <span className="text-sm"> · {data.points.pending} pending</span>}
-        </p>
-      </section>
-
-      {/* A brand new player gets one instruction and nothing to scroll past. */}
       {!data.onboarded ? (
-        <Link href="/welcome" className="block rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <p className="font-semibold text-amber-900">Start your practice round</p>
-          <p className="mt-1 text-sm text-amber-900">
-            Four photos, two minutes. You will see how close you are to an expert, and what you already read well.
-          </p>
-          <p className="mt-2 text-sm font-medium text-amber-800">Begin →</p>
-        </Link>
+        <BentoTile href="/welcome" span={2} delay={0.06} className="border-sand/50 bg-white/90">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-6 w-6 shrink-0 text-aqua" strokeWidth={1.75} />
+            <div>
+              <p className="font-bold text-ink">Start your practice round</p>
+              <p className="mt-1 text-sm text-muted">
+                Four photos, two minutes. See how close you are to an expert.
+              </p>
+              <p className="mt-2 text-sm font-semibold text-aqua">Begin →</p>
+            </div>
+          </div>
+        </BentoTile>
       ) : (
-        <>
-          {receipts.length > 0 && (
-            <section className="space-y-2">
-              <h2 className="text-sm font-semibold text-muted">
-                What your work did{data.unseen_receipts > receipts.length && ` (${data.unseen_receipts} new)`}
-              </h2>
-              {receipts.map((r) => (
-                <article key={r.id} className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
-                  <p className="text-sm text-brand-900">{r.message}</p>
-                  <button
-                    onClick={() => markSeen(r.id)}
-                    className="mt-2 min-h-11 rounded-xl bg-white px-4 text-sm font-medium text-brand-700"
-                  >
-                    Got it
-                  </button>
-                </article>
-              ))}
-            </section>
+        <div className="grid grid-cols-2 gap-3">
+          {data.river && (
+            <BentoTile span={2} delay={0} className="overflow-hidden p-0">
+              <LivingRiver river={data.river} />
+            </BentoTile>
           )}
 
-          {data.lesson && (
-            <Link href="/observations" className="block rounded-2xl border border-sky-200 bg-sky-50 p-4">
-              <p className="text-sm font-semibold text-sky-900">Today&apos;s lesson · {data.lesson.indicator_label}</p>
-              <p className="mt-1 text-sm text-sky-900">
-                You scored {data.lesson.your_label ?? data.lesson.your_score}, the expert said{" "}
-                {data.lesson.expert_label ?? data.lesson.expert_score}.
-              </p>
-              <p className="mt-1 text-sm text-sky-800">{data.lesson.why}</p>
-            </Link>
-          )}
+          <BentoTile delay={0.06} className="bg-white/90">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Level</p>
+            <p className="font-display text-2xl text-deep">{data.level.label}</p>
+            <LiquidProgress value={progress} className="mt-2" height={6} />
+          </BentoTile>
+
+          <BentoTile delay={0.12} className="bg-white/90">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Points</p>
+            <p className="font-display text-2xl text-deep">
+              <CountUp value={data.points.awarded} />
+            </p>
+            {data.points.pending > 0 && (
+              <Chip tone="sand" className="mt-2">{data.points.pending} pending</Chip>
+            )}
+          </BentoTile>
 
           {data.quest && (
-            <section className="rounded-2xl bg-white p-4 shadow-sm">
+            <BentoTile
+              href={data.quest.type === "spot_check_count" ? "/play" : "/assess"}
+              span={2}
+              delay={0.18}
+              className="bg-white/90"
+            >
               <div className="flex items-baseline justify-between gap-2">
-                <p className="font-semibold">{data.quest.label}</p>
-                <span className="shrink-0 text-sm text-muted">
+                <p className="font-bold text-ink">{data.quest.label}</p>
+                <span className="shrink-0 text-sm font-semibold text-muted">
                   {data.quest.current}/{data.quest.target}
                 </span>
               </div>
               <p className="mt-0.5 text-sm text-muted">{data.quest.description}</p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface">
-                <div
-                  className="motion-safe:transition-all h-full rounded-full bg-brand-500"
-                  style={{ width: `${data.quest.percent}%` }}
-                />
+              <LiquidProgress value={data.quest.percent} className="mt-3" />
+              <p className="mt-2 text-sm font-semibold text-aqua">
+                {data.quest.type === "spot_check_count" ? "Play Spot Check →" : "Check a stream →"}
+              </p>
+            </BentoTile>
+          )}
+
+          {receipts.length > 0 && (
+            <BentoTile span={2} delay={0.24} className="bg-white/90">
+              <div className="mb-2 flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-aqua" strokeWidth={1.75} />
+                <p className="text-sm font-bold text-ink">
+                  What your work did
+                  {data.unseen_receipts > receipts.length && ` (${data.unseen_receipts} new)`}
+                </p>
               </div>
-              <Link
-                href={data.quest.type === "spot_check_count" ? "/play" : "/assess"}
-                className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white"
-              >
-                {data.quest.type === "spot_check_count" ? "Play Spot Check" : "Check a stream"}
-              </Link>
-            </section>
+              <ul className="space-y-2">
+                {receipts.map((r) => (
+                  <li key={r.id} className="rounded-2xl bg-cloud p-3 text-sm text-ink">
+                    {r.message}
+                    <Button variant="ghost" onClick={() => markSeen(r.id)} className="mt-2 w-full min-h-11 text-sm">
+                      Got it
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </BentoTile>
+          )}
+
+          {data.lesson && (
+            <BentoTile href="/observations" span={2} delay={0.3} className="bg-white/90">
+              <div className="flex gap-3">
+                <BookOpen className="h-6 w-6 shrink-0 text-aqua" strokeWidth={1.75} />
+                <div>
+                  <p className="text-sm font-bold text-ink">Today&apos;s lesson · {data.lesson.indicator_label}</p>
+                  <p className="mt-1 text-sm text-muted">
+                    You scored {data.lesson.your_label ?? data.lesson.your_score}, the expert said{" "}
+                    {data.lesson.expert_label ?? data.lesson.expert_score}.
+                  </p>
+                  <p className="mt-1 text-sm text-ink">{data.lesson.why}</p>
+                </div>
+              </div>
+            </BentoTile>
           )}
 
           {data.due_site && (
-            <Link
+            <BentoTile
               href={`/assess?site=${data.due_site.site_id}`}
-              className={`block rounded-2xl border p-4 ${
-                data.due_site.due_status === "due"
-                  ? "border-red-200 bg-red-50"
-                  : "border-amber-200 bg-amber-50"
-              }`}
+              span={2}
+              delay={0.36}
+              className={data.due_site.due_status === "due" ? "border-coral/30 bg-sand/30" : "border-sand/40 bg-sand/20"}
             >
-              <p className={`text-sm font-semibold ${data.due_site.due_status === "due" ? "text-red-800" : "text-amber-900"}`}>
-                {data.due_site.name ?? "Your adopted stream"} is due for a check
-              </p>
-              <p className="mt-1 text-sm text-ink">
-                {data.due_site.streak_months > 0
-                  ? `Keep your ${data.due_site.streak_months}-month streak going.`
-                  : "One check a month is all it takes."}
-              </p>
-              <p className="mt-2 text-sm font-medium text-brand-700">Check it now →</p>
-            </Link>
+              <div className="flex gap-3">
+                <MapPin className="h-6 w-6 shrink-0 text-deep" strokeWidth={1.75} />
+                <div>
+                  <p className="text-sm font-bold text-ink">
+                    {data.due_site.name ?? "Your adopted stream"} is due for a check
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    {data.due_site.streak_months > 0
+                      ? `Keep your ${data.due_site.streak_months}-month streak going.`
+                      : "One check a month is all it takes."}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-aqua">Check it now →</p>
+                </div>
+              </div>
+            </BentoTile>
           )}
 
           {receipts.length === 0 && !data.lesson && !data.quest && !data.due_site && (
-            <section className="rounded-2xl bg-white p-5 text-center shadow-sm">
-              <p className="font-semibold">All caught up</p>
+            <BentoTile span={2} delay={0.12} className="bg-white/90 text-center">
+              <p className="font-bold text-ink">All caught up</p>
               <p className="mt-1 text-sm text-muted">
-                Nothing waiting for you. Check a stream, or help verify someone else&apos;s photos.
+                Check a stream, or help verify someone else&apos;s photos.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <Link
-                  href="/assess"
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-600 font-semibold text-white"
-                >
-                  Check a stream
-                </Link>
-                <Link
-                  href="/play"
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line font-medium"
-                >
-                  Play Spot Check
-                </Link>
+                <Button href="/assess" className="w-full text-sm">Check a stream</Button>
+                <Button href="/play" variant="secondary" className="w-full text-sm">Spot Check</Button>
               </div>
-            </section>
+            </BentoTile>
           )}
-        </>
+        </div>
       )}
     </div>
   );

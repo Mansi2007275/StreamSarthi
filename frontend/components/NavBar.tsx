@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUnseenLessonsCount } from "@/lib/lessonsStore";
 import { supabase } from "@/lib/supabase";
 import { useMe } from "@/lib/useMe";
+import Wordmark from "@/components/ui/Wordmark";
+import { cn } from "@/lib/cn";
 
 const links = [
   { href: "/", label: "Home" },
@@ -30,11 +32,10 @@ export default function NavBar({ email }: { email: string }) {
   const allLinks = canReview ? [...links, { href: "/review", label: "Review" }, { href: "/insights", label: "Insights" }] : links;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-white/40 bg-glass shadow-glass backdrop-blur-xl">
       <div className="mx-auto flex max-w-xl items-center justify-between gap-1 px-3 py-2">
-        <Link href="/" className="flex shrink-0 items-center gap-1.5 font-semibold text-brand-700">
-          <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500 text-white">~</span>
-          <span className="hidden sm:inline">StreamSaathi</span>
+        <Link href="/" className="flex shrink-0 items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua">
+          <Wordmark className="h-7 w-[7.5rem]" />
         </Link>
         <nav className="hidden items-center gap-0.5 text-sm md:flex">
           {allLinks.map((l) => {
@@ -43,17 +44,24 @@ export default function NavBar({ email }: { email: string }) {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`relative flex min-h-11 items-center rounded-lg px-2 ${active ? "bg-brand-50 font-medium text-brand-700" : "text-muted"}`}
+                className={cn(
+                  "relative flex min-h-11 items-center rounded-xl px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua",
+                  active ? "bg-aqua/15 font-semibold text-deep" : "text-muted",
+                )}
               >
                 {l.label}
                 {l.href === "/" && unseenLessons > 0 && (
-                  <span aria-label={`${unseenLessons} unseen lessons`} className="absolute right-0.5 top-1 h-2 w-2 rounded-full bg-red-500" />
+                  <span aria-label={`${unseenLessons} unseen lessons`} className="absolute right-0.5 top-1 h-2 w-2 rounded-full bg-coral" />
                 )}
               </Link>
             );
           })}
         </nav>
-        <button onClick={signOut} title={email} className="min-h-11 rounded-lg px-2 text-sm text-muted hover:text-ink">
+        <button
+          onClick={signOut}
+          title={email}
+          className="min-h-11 rounded-xl px-2 text-sm text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua"
+        >
           Logout
         </button>
       </div>

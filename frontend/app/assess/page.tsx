@@ -352,7 +352,7 @@ function Assess() {
         )}
       </StepCard>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 p-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/40 bg-glass p-3 shadow-glass backdrop-blur-xl md:bottom-0">
         <div className="mx-auto flex max-w-xl gap-2">
           <button
             onClick={() => setIdx(idx - 1)}

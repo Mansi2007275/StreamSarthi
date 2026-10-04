@@ -2,80 +2,92 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, Play, Waves, User, Plus } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { cn } from "@/lib/cn";
 
-/** Mobile navigation. Hidden from md up, where the existing NavBar takes over.
- *
- *  Five tabs, with Check raised in the middle because it is the thing we most want people
- *  to do. Review is deliberately not a sixth tab: it applies to a handful of experts, and
- *  a tab bar that cramped would cost every other user a readable target. */
 const TABS = [
-  { href: "/", label: "Home", icon: "M3 10.5 12 3l9 7.5V21H3z" },
-  { href: "/play", label: "Play", icon: "M8 5v14l11-7z" },
-  { href: "/my-stream", label: "My Stream", icon: "M4 14c4-6 12 6 16 0M4 8c4-6 12 6 16 0" },
-  { href: "/profile", label: "Profile", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" },
-];
-
-function Icon({ path }: { path: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden>
-      <path d={path} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+  { href: "/", label: "Home", Icon: Home },
+  { href: "/play", label: "Play", Icon: Play },
+  { href: "/my-stream", label: "Stream", Icon: Waves },
+  { href: "/profile", label: "Profile", Icon: User },
+] as const;
 
 export default function BottomTabBar() {
   const pathname = usePathname();
+  const reduce = useReducedMotion();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const assessActive = pathname.startsWith("/assess");
 
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/30 bg-glass shadow-glass backdrop-blur-xl md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="mx-auto grid max-w-xl grid-cols-5 items-end">
+      <ul className="mx-auto grid max-w-xl grid-cols-5 items-end px-1">
         {TABS.slice(0, 2).map((t) => (
-          <li key={t.href}>
-            <TabLink tab={t} active={isActive(t.href)} />
-          </li>
+          <TabItem key={t.href} tab={t} active={isActive(t.href)} reduce={!!reduce} />
         ))}
 
         <li className="flex justify-center">
           <Link
             href="/assess"
             aria-label="New stream check"
-            aria-current={isActive("/assess") ? "page" : undefined}
-            className={`-mt-5 grid h-14 w-14 place-items-center rounded-full text-white shadow-lg ${
-              isActive("/assess") ? "bg-brand-700" : "bg-brand-600"
-            }`}
+            aria-current={assessActive ? "page" : undefined}
+            className="relative -mt-5 grid h-[3.25rem] w-[3.25rem] min-h-11 min-w-11 place-items-center rounded-full bg-aqua text-white shadow-[0_12px_28px_-6px_rgba(0,194,199,0.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mint"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-7 w-7" aria-hidden>
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
+            {!reduce && (
+              <motion.span
+                className="absolute inset-0 rounded-full border-2 border-mint/50"
+                animate={{ scale: [1, 1.18], opacity: [0.6, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+              />
+            )}
+            <Plus className="h-7 w-7" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Check</span>
           </Link>
         </li>
 
         {TABS.slice(2).map((t) => (
-          <li key={t.href}>
-            <TabLink tab={t} active={isActive(t.href)} />
-          </li>
+          <TabItem key={t.href} tab={t} active={isActive(t.href)} reduce={!!reduce} />
         ))}
       </ul>
     </nav>
   );
 }
 
-function TabLink({ tab, active }: { tab: (typeof TABS)[number]; active: boolean }) {
+function TabItem({
+  tab,
+  active,
+  reduce,
+}: {
+  tab: (typeof TABS)[number];
+  active: boolean;
+  reduce: boolean;
+}) {
   return (
-    <Link
-      href={tab.href}
-      aria-current={active ? "page" : undefined}
-      className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] ${
-        active ? "font-semibold text-brand-700" : "text-muted"
-      }`}
-    >
-      <Icon path={tab.icon} />
-      <span className="leading-none">{tab.label}</span>
-    </Link>
+    <li className="relative">
+      {active && !reduce && (
+        <motion.span
+          layoutId="tab-blob"
+          className="absolute inset-x-1 top-2 bottom-2 rounded-2xl bg-aqua/15"
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+        />
+      )}
+      <Link
+        href={tab.href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "relative flex min-h-[3.5rem] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-aqua",
+          active ? "font-semibold text-deep" : "text-muted",
+        )}
+      >
+        <motion.span whileTap={reduce ? undefined : { scale: 0.88, y: -2 }} transition={{ type: "spring", stiffness: 400, damping: 22 }}>
+          <tab.Icon className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+        </motion.span>
+        <span className="leading-none">{tab.label}</span>
+      </Link>
+    </li>
   );
 }

@@ -92,6 +92,12 @@ function Timeline() {
           Check now
         </Link>
         <Link
+          href={`/s/${data.site_id}`}
+          className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line font-medium"
+        >
+          Public station page
+        </Link>
+        <Link
           href={`/s/${data.site_id}/poster`}
           className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line font-medium"
         >
