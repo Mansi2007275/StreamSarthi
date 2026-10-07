@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import AuthGuard from "@/components/AuthGuard";
 import AISecondOpinion from "@/components/AISecondOpinion";
 import ConfidencePicker from "@/components/ConfidencePicker";
@@ -141,13 +141,7 @@ function Assess() {
   }
 
   if (!indicators) {
-    return (
-      <div className="space-y-3">
-        <div className="skeleton h-8 w-2/3" />
-        <div className="skeleton h-40" />
-        <div className="skeleton h-64" />
-      </div>
-    );
+    return <AssessSkeleton />;
   }
 
   if (atSiteStep) {
@@ -379,10 +373,23 @@ function Assess() {
   );
 }
 
+function AssessSkeleton() {
+  return (
+    <div className="space-y-3">
+      <div className="skeleton h-8 w-2/3" />
+      <div className="skeleton h-40" />
+      <div className="skeleton h-64" />
+    </div>
+  );
+}
+
 export default function AssessPage() {
   return (
     <AuthGuard>
-      <Assess />
+      {/* useSearchParams() reads ?site / ?source on the client, so it needs a boundary. */}
+      <Suspense fallback={<AssessSkeleton />}>
+        <Assess />
+      </Suspense>
     </AuthGuard>
   );
 }

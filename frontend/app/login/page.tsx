@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import Wordmark from "@/components/ui/Wordmark";
@@ -52,9 +52,24 @@ function FloatingInput({
   );
 }
 
+/** Owns the only `useSearchParams()` read on this page. Search params are known
+ *  only at request time, so the hook has to sit behind <Suspense>; keeping it in a
+ *  render-nothing leaf lets the form itself stay in the prerendered HTML. */
+function NextParam({ onResolve }: { onResolve: (next: string | null) => void }) {
+  const searchParams = useSearchParams();
+  // Store next parameter from URL, validate it's relative
+  const nextParam = searchParams.get("next");
+  const nextUrl = nextParam && nextParam.startsWith("/") ? nextParam : null;
+
+  useEffect(() => {
+    onResolve(nextUrl);
+  }, [nextUrl, onResolve]);
+
+  return null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const session = useSession();
   const [mode, setMode] = useState<Mode>("password");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -62,13 +77,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  // Store next parameter from URL, validate it's relative
-  const nextParam = searchParams.get("next");
-  const nextUrl = nextParam && nextParam.startsWith("/") ? nextParam : null;
+  // undefined -> ?next= not read yet; null -> absent or not a relative path
+  const [nextUrl, setNextUrl] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (session) {
+    // Wait for the param to be read, so an already-logged-in visitor arriving on
+    // /login?next=/x is not bounced to the home page before /x is known.
+    if (session && nextUrl !== undefined) {
       // Redirect to `next` parameter if provided, otherwise home
       const redirectTo = nextUrl || "/";
       router.replace(redirectTo);
@@ -115,6 +130,10 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-[100dvh] flex-col justify-center hero-gradient px-4 py-8">
       {/* Form is plain HTML + CSS so it paints before Motion/ heavy JS — no opacity:0 entrance */}
+      <Suspense fallback={null}>
+        <NextParam onResolve={setNextUrl} />
+      </Suspense>
+
       <div className="relative z-[1] mx-auto w-full max-w-sm">
         <div className="mb-6 text-center">
           <Wordmark className="mx-auto h-8 w-40" light />

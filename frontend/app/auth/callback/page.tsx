@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 
+function Signing() {
+  return <p className="p-8 text-center text-muted">Signing you in...</p>;
+}
+
 /** Magic link / email-confirm lands here. supabase-js reads the token from the URL automatically. */
-export default function AuthCallback() {
+function AuthCallback() {
   const session = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,5 +39,15 @@ export default function AuthCallback() {
     }
   }, [session, router, nextUrl]);
 
-  return <p className="p-8 text-center text-muted">Signing you in...</p>;
+  return <Signing />;
+}
+
+// useSearchParams() bails out of prerendering, so the page itself stays static
+// and only the token-reading part waits for the client.
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<Signing />}>
+      <AuthCallback />
+    </Suspense>
+  );
 }
