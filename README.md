@@ -4,9 +4,7 @@
 
 `OneAquaHealth IEEE Global Hackathon 2026` · Primary: **Track 5, Community & Gamification** · Secondary: **Track 3, AI-Supported Assessment** · Team **0xalgos**
 
-> Live demo: _add Vercel URL_ · API docs: _add Render URL_`/docs` · Demo video: _add link_
 
----
 
 ## The problem
 
