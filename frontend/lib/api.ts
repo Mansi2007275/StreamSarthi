@@ -38,7 +38,7 @@ import type {
   VoteResult,
 } from "./types";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").trim().replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(
